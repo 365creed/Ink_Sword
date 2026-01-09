@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Seoul Rush — Zombie Mix (Forward Runner)</title>
+  <title>Seoul Rush — Ink Runner</title>
   <style>
     html,body{margin:0;height:100%;background:#f6f7fb;font-family:system-ui,-apple-system,"Noto Sans KR",Arial}
     .wrap{height:100%;display:grid;place-items:center;padding:14px}
@@ -20,7 +20,7 @@
     .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
     .panel{
       text-align:center;background:rgba(255,255,255,.92);border:1px solid #e7e9ef;border-radius:16px;
-      padding:16px; width:min(520px,90vw); box-shadow:0 14px 34px rgba(0,0,0,.10)
+      padding:16px; width:min(560px,92vw); box-shadow:0 14px 34px rgba(0,0,0,.10)
     }
     .panel h2{margin:0 0 6px;font-size:18px;letter-spacing:-.02em}
     .panel p{margin:0;color:#6b7280;font-size:13px;line-height:1.55}
@@ -30,11 +30,10 @@
 <div class="wrap">
   <div class="card">
     <div class="topbar">
-      <div class="title">Seoul Rush — Human Runner vs Zombie Seoul</div>
+      <div class="title">Seoul Rush — Ink Runner (광활지 + 구르기 대시)</div>
       <div class="hint">
-        이동: <span class="kbd">←</span><span class="kbd">→</span> (누르고 있기 가능) ·
-        대시(회피): <span class="kbd">Shift</span> · 재시작: <span class="kbd">R</span><br/>
-        모바일: 드래그/좌우 스와이프 · 탭으로 시작/재시작
+        이동: <span class="kbd">←</span><span class="kbd">→</span> (부드러운 이동) · 대시(구르기): <span class="kbd">Shift</span> · 재시작: <span class="kbd">R</span><br/>
+        모바일: 드래그로 이동 · 두 손가락 탭(또는 상단 탭) = 대시
       </div>
     </div>
 
@@ -44,10 +43,10 @@
         <div class="panel" id="pn">
           <h2>시작하기</h2>
           <p>
-            정면으로 달려오며 서울 풍경 속 좀비를 피하세요.<br/>
-            <b>좌우 이동</b>은 연속(부드럽게), 좀비는 <b>흔들기/추격</b>합니다.<br/>
-            <b>대시(회피 1회)</b>: <span class="kbd">Shift</span> (아이템으로 충전)<br/>
-            시작: <span class="kbd">Space</span> 또는 화면 탭
+            트랙이 아니라 <b>광활한 들판</b>을 자유롭게 달립니다.<br/>
+            좀비는 <b>흔들/추격</b>하며 정면으로 다가옵니다.<br/>
+            <b>Shift</b>로 옆으로 <b>구르기 대시</b>(무적) · 아이템으로 대시 충전<br/>
+            시작: <span class="kbd">Space</span> / 화면 탭
           </p>
         </div>
       </div>
@@ -59,7 +58,6 @@
 (() => {
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d", { alpha:false });
-
   const ov = document.getElementById("ov");
   const pn = document.getElementById("pn");
 
@@ -71,7 +69,7 @@
   fit();
 
   // ---------- Storage ----------
-  const HI_KEY = "seoul_rush_hi_v2";
+  const HI_KEY = "seoul_rush_hi_ink_v1";
   const loadHi = () => Number(localStorage.getItem(HI_KEY) || "0");
   const saveHi = (v) => localStorage.setItem(HI_KEY, String(v));
 
@@ -80,57 +78,113 @@
   const lerp = (a,b,t)=>a+(b-a)*t;
   const rand = (a,b)=>a+Math.random()*(b-a);
   const randi = (a,b)=>Math.floor(rand(a,b+1));
-  const smooth01 = (t)=>t*t*(3-2*t); // smoothstep
+  const smooth01 = (t)=>t*t*(3-2*t);
+  const easeOutCubic = (t)=>1-Math.pow(1-t,3);
 
-  // ---------- tiny audio (no external files) ----------
-  // Works on user gesture only. Keep it subtle.
+  // ---------- Ink-ish rendering helpers ----------
+  // Paper noise cache
+  const paper = document.createElement("canvas");
+  paper.width = 512; paper.height = 512;
+  const pctx = paper.getContext("2d");
+  (function makePaper(){
+    pctx.fillStyle = "#fbfbf8";
+    pctx.fillRect(0,0,paper.width,paper.height);
+    // subtle fibers
+    for(let i=0;i<9000;i++){
+      const x = Math.random()*paper.width;
+      const y = Math.random()*paper.height;
+      const a = Math.random()*0.06;
+      pctx.fillStyle = `rgba(15,23,42,${a})`;
+      pctx.fillRect(x,y,1,1);
+    }
+    // faint wash
+    const g = pctx.createRadialGradient(160,140,20, 280,240,380);
+    g.addColorStop(0,"rgba(30,41,59,0.05)");
+    g.addColorStop(1,"rgba(30,41,59,0)");
+    pctx.fillStyle = g;
+    pctx.fillRect(0,0,paper.width,paper.height);
+  })();
+
+  function inkStrokePath(points, width, alpha){
+    // draw slightly jittered strokes to mimic brush
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = `rgba(15,23,42,${alpha})`;
+    for(let k=0;k<2;k++){
+      ctx.lineWidth = width * (k===0 ? 1.0 : 0.72);
+      ctx.beginPath();
+      for(let i=0;i<points.length;i++){
+        const pt = points[i];
+        const jx = (Math.random()*2-1) * (k===0?0.6:1.0);
+        const jy = (Math.random()*2-1) * (k===0?0.6:1.0);
+        if(i===0) ctx.moveTo(pt.x + jx, pt.y + jy);
+        else ctx.lineTo(pt.x + jx, pt.y + jy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function inkFillRect(x,y,w,h, alpha){
+    // washed fill
+    ctx.save();
+    ctx.fillStyle = `rgba(15,23,42,${alpha})`;
+    ctx.fillRect(x,y,w,h);
+    ctx.restore();
+  }
+
+  // ---------- tiny audio ----------
   let audioCtx = null;
   function beep(type="ok"){
     if(!audioCtx) return;
     const t = audioCtx.currentTime;
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    o.type = "square";
-    o.frequency.value = (type==="hit") ? 180 : (type==="dash" ? 520 : 360);
+    o.type = "triangle";
+    o.frequency.value = (type==="hit") ? 160 : (type==="dash" ? 520 : 340);
     g.gain.value = 0.0001;
     o.connect(g); g.connect(audioCtx.destination);
     o.start(t);
-    g.gain.exponentialRampToValueAtTime(0.08, t+0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + (type==="hit"?0.12:0.08));
-    o.stop(t + (type==="hit"?0.13:0.09));
+    g.gain.exponentialRampToValueAtTime(0.06, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (type==="hit"?0.14:0.09));
+    o.stop(t + (type==="hit"?0.15:0.10));
+  }
+  function vibrate(ms){
+    try{ if(navigator.vibrate) navigator.vibrate(ms); }catch{}
   }
 
-  // ---------- World/Perspective ----------
-  const ROAD = {
-    centerX: canvas.width/2,
-    horizonY: 128,
-    nearY: 528,
-    widthNear: 420,
-    widthFar: 120,
+  // ---------- World/Perspective (WIDE FIELD) ----------
+  // 트랙 느낌 제거: road 폭 크게(광활지), 가이드 라인 없음
+  const WORLD = {
+    cx: canvas.width/2,
+    horizonY: 118,
+    nearY: 534,
+    widthNear: 920,  // 넓게!
+    widthFar: 520,   // 멀리도 넓게
+    xLimit: 1.35,    // 플레이어가 누빌 수 있는 필드 범위(정규화)
   };
 
-  // World: x is normalized road coordinate ~ [-1..1]
-  // z: 0 near, 1 far
   function project(xNorm, z){
-    const p = clamp(z, 0, 1);
-    const roadW = lerp(ROAD.widthNear, ROAD.widthFar, p);
-    const x = ROAD.centerX + xNorm * (roadW/2);
-    const y = lerp(ROAD.nearY, ROAD.horizonY, p);
-    const scale = lerp(1.35, 0.22, p);
-    return { x, y, scale, roadW };
+    const p = clamp(z,0,1);
+    const w = lerp(WORLD.widthNear, WORLD.widthFar, p);
+    const x = WORLD.cx + xNorm * (w/2);
+    const y = lerp(WORLD.nearY, WORLD.horizonY, p);
+    const scale = lerp(1.45, 0.22, p);
+    return {x,y,scale,w};
   }
 
-  // ---------- Chapters (1~4 모두 포함: 순서 연출) ----------
+  // ---------- Chapters ----------
   const CHAPTERS = [
-    { key:"hospital",  name:"응급 병원",   mood:"sirens",   bg:"hospital" },
-    { key:"gwang",     name:"광화문",      mood:"stone",    bg:"gwang" },
-    { key:"hangang",   name:"한강",        mood:"river",    bg:"hangang" },
-    { key:"namsan",    name:"남산타워",    mood:"hill",     bg:"namsan" },
-    { key:"subway",    name:"지하철",      mood:"metro",    bg:"subway" },
-    { key:"palace",    name:"경복궁",      mood:"roof",     bg:"palace" },
+    { key:"hospital",  name:"응급 병원", bg:"hospital" },
+    { key:"gwang",     name:"광화문",    bg:"gwang" },
+    { key:"hangang",   name:"한강",      bg:"hangang" },
+    { key:"namsan",    name:"남산타워",  bg:"namsan" },
+    { key:"subway",    name:"지하철",    bg:"subway" },
+    { key:"palace",    name:"경복궁",    bg:"palace" },
   ];
 
-  // ---------- Game State ----------
+  // ---------- State ----------
   const state = {
     started:false,
     running:false,
@@ -139,184 +193,118 @@
     t:0,
     dt:0,
 
-    // forward speed: how fast objects approach (z decreases)
-    speed: 0.62,
+    speed: 0.64,
     speedMax: 1.55,
     speedGain: 0.014,
 
-    // score
     score: 0,
     hi: loadHi(),
+    danger: 0,
 
-    // dynamic difficulty
-    danger: 0,        // 0..1
-    spawnTimer: 0,
-    spawnEvery: 0.92,
-
-    // zombies + items
     mobs: [],
-    items: [],        // dash-charge pickups
+    items: [],
+    bgObjs: [],
     particles: [],
 
-    // background objects (big silhouettes coming toward camera)
-    bgObjs: [],
+    spawnTimer: 0,
+    spawnEvery: 0.90,
 
-    // chapter system
     chapterIndex: 0,
     chapterTime: 0,
-    chapterLength: 18,     // seconds per chapter
-    chapterBanner: 0,      // 0..1 fade
+    chapterLength: 18,
+    banner: 0,
     bannerText: "",
 
-    // hit effects
-    hitFlash: 0,           // 0..1
-    shake: 0,              // px
+    hitFlash: 0,
+    shake: 0,
   };
 
+  // ---------- Player (SMOOTH + ROLL DASH) ----------
   const input = {
     left:false,
     right:false,
-    dash:false,
-    pointerDown:false,
-    pointerX: 0,
+    dashHeld:false,
+    dashPressed:false,   // edge-trigger
     dragging:false,
-    lastPointerX: 0,
+    pointerDown:false,
+    lastPointerX:0,
+    twoFingerTap:false,
+    lastMoveDir: 1,      // -1 or +1
   };
 
   const player = {
-    x: 0,           // normalized road x [-1..1]
-    vx: 0,
-    dashCharge: 1,  // 회피 1회(아이템으로 충전)
-    dashCD: 0,
+    x: 0,          // current
+    v: 0,          // velocity
+    targetX: 0,    // where we want to go
     invuln: 0,
+
+    dashCharge: 1,
+    dashCD: 0,
+
+    // dash animation
+    dashing:false,
+    dashT: 0,
+    dashDur: 0.22,
+    dashFrom: 0,
+    dashTo: 0,
+    roll: 0,       // rotation for roll
   };
 
-  // ---------- Content: Zombies ----------
   const ZOMBIE_TYPES = [
-    { key:"basic",  w:44, h:80,  style:"basic"  },
-    { key:"hat",    w:48, h:86,  style:"hat"    },
-    { key:"mask",   w:46, h:82,  style:"mask"   },
-    { key:"nurse",  w:46, h:84,  style:"nurse"  },
-    { key:"runner", w:42, h:76,  style:"runner" },
+    { key:"basic", style:"basic" },
+    { key:"hat", style:"hat" },
+    { key:"mask", style:"mask" },
+    { key:"nurse", style:"nurse" },
+    { key:"runner", style:"runner" },
   ];
 
-  // Spawn big background silhouettes by chapter
-  function spawnBgSilhouette(kind){
-    // Spawn at far z and move toward viewer; placed off-road sides or skyline
-    const side = Math.random()<0.5 ? -1 : 1;
-    const xNorm = side * rand(1.0, 1.8);
-    state.bgObjs.push({
-      kind,
-      xNorm,
-      z: rand(0.86, 1.25),
-      wob: rand(0, Math.PI*2),
-    });
-  }
-
-  function spawnZombie(){
-    const d = state.danger;
-    const poolMax = Math.max(2, Math.floor(2 + d*(ZOMBIE_TYPES.length-2)));
-    const type = ZOMBIE_TYPES[randi(0, poolMax)];
-
-    // spawn near center-ish but anywhere on road
-    const x = rand(-0.95, 0.95);
-    const z = rand(0.86, 1.12);
-
-    // AI behavior: some sway, some chase
-    const behaviorRoll = Math.random();
-    const behavior = (behaviorRoll < 0.45) ? "sway" : (behaviorRoll < 0.85 ? "chase" : "zigzag");
-
-    state.mobs.push({
-      type,
-      x,
-      z,
-      vx: 0,
-      swayAmp: rand(0.05, 0.16),
-      swaySpd: rand(1.8, 3.4),
-      phase: rand(0, Math.PI*2),
-      behavior,
-      // chase tuning
-      chaseAggro: rand(0.35, 0.85),
-      // size jitter
-      bob: rand(0, Math.PI*2),
-    });
-  }
-
-  function spawnDashItem(){
-    // pickup that refills dashCharge by 1 up to 2
-    state.items.push({
-      x: rand(-0.9, 0.9),
-      z: rand(0.9, 1.2),
-      wob: rand(0, Math.PI*2),
-    });
-  }
-
-  // ---------- Overlay ----------
   function showOverlay(title, html){
     ov.style.display = "flex";
     pn.querySelector("h2").textContent = title;
     pn.querySelector("p").innerHTML = html;
   }
-  function hideOverlay(){ ov.style.display = "none"; }
+  function hideOverlay(){ ov.style.display="none"; }
 
-  function setChapter(idx, showBanner=true){
+  function setChapter(idx, show=true){
     state.chapterIndex = (idx + CHAPTERS.length) % CHAPTERS.length;
     state.chapterTime = 0;
+    state.bannerText = CHAPTERS[state.chapterIndex].name;
+    if(show) state.banner = 1;
 
-    const c = CHAPTERS[state.chapterIndex];
-    state.bannerText = c.name;
-    if(showBanner){
-      state.chapterBanner = 1;
-    }
-
-    // Immediately add some silhouettes for that chapter
-    for(let i=0;i<4;i++) spawnBgSilhouette(c.bg);
+    for(let i=0;i<4;i++) spawnBgSilhouette(CHAPTERS[state.chapterIndex].bg);
   }
 
   function reset(){
-    state.started=false;
-    state.running=false;
-    state.over=false;
-    state.last=0;
-    state.t=0;
-    state.score=0;
+    state.started=false; state.running=false; state.over=false;
+    state.last=0; state.t=0; state.score=0;
+    state.speed=0.64; state.danger=0;
 
-    state.speed=0.62;
-    state.danger=0;
-    state.spawnTimer=0;
-    state.spawnEvery=0.92;
+    state.mobs.length=0; state.items.length=0; state.bgObjs.length=0; state.particles.length=0;
+    state.spawnTimer=0; state.spawnEvery=0.90;
 
-    state.mobs.length=0;
-    state.items.length=0;
-    state.particles.length=0;
-    state.bgObjs.length=0;
+    state.hitFlash=0; state.shake=0;
 
-    state.hitFlash=0;
-    state.shake=0;
-
-    player.x=0; player.vx=0;
-    player.dashCharge=1;
-    player.dashCD=0;
+    player.x=0; player.v=0; player.targetX=0;
     player.invuln=0;
+    player.dashCharge=1; player.dashCD=0;
+    player.dashing=false; player.dashT=0; player.roll=0;
+
+    input.left=false; input.right=false; input.dashHeld=false; input.dashPressed=false;
+    input.dragging=false; input.pointerDown=false; input.twoFingerTap=false; input.lastMoveDir=1;
 
     setChapter(0, true);
 
     showOverlay(
       "시작하기",
-      `서울 풍경이 <b>정면으로 다가오고</b>, 좀비가 <b>흔들/추격</b>합니다.<br/>
-       이동: <span class="kbd">←</span><span class="kbd">→</span> 또는 드래그 ·
-       대시(회피): <span class="kbd">Shift</span><br/>
+      `광활지(트랙 없음) 위를 자유롭게 달립니다.<br/>
+       이동은 <b>스프링</b>처럼 부드럽게 · 대시는 <b>옆으로 구르기</b><br/>
        시작: <span class="kbd">Space</span> / 화면 탭`
     );
   }
 
   function startGame(){
-    state.started=true;
-    state.running=true;
-    state.over=false;
+    state.started=true; state.running=true; state.over=false;
     hideOverlay();
-
-    // unlock audio on gesture
     if(!audioCtx){
       try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch{}
     }
@@ -324,34 +312,75 @@
   }
 
   function gameOver(){
-    state.running=false;
-    state.over=true;
-
+    state.running=false; state.over=true;
     const s = Math.floor(state.score);
-    if(s > state.hi){ state.hi = s; saveHi(state.hi); }
+    if(s > state.hi){ state.hi=s; saveHi(state.hi); }
+    showOverlay("GAME OVER", `점수: <b>${s}</b> · 최고: <b>${state.hi}</b><br/>재시작: <span class="kbd">R</span> / 화면 탭`);
+  }
 
-    showOverlay(
-      "GAME OVER",
-      `점수: <b>${s}</b> · 최고: <b>${state.hi}</b><br/>
-       다시 시작: <span class="kbd">R</span> 또는 화면 탭`
-    );
+  // ---------- Spawns ----------
+  function spawnBgSilhouette(kind){
+    const side = Math.random()<0.5 ? -1 : 1;
+    const xNorm = side * rand(1.05, 1.95);
+    state.bgObjs.push({ kind, xNorm, z: rand(0.86, 1.30), wob: rand(0,Math.PI*2) });
+  }
+
+  function spawnZombie(){
+    const d = state.danger;
+    const poolMax = Math.max(2, Math.floor(2 + d*(ZOMBIE_TYPES.length-2)));
+    const type = ZOMBIE_TYPES[randi(0, poolMax)];
+
+    // 넓은 필드 전체에서 등장
+    const x = rand(-WORLD.xLimit, WORLD.xLimit);
+    const z = rand(0.86, 1.14);
+
+    const roll = Math.random();
+    const behavior = (roll < 0.42) ? "sway" : (roll < 0.86 ? "chase" : "zigzag");
+
+    state.mobs.push({
+      type,
+      x, z,
+      phase: rand(0, Math.PI*2),
+      swayAmp: rand(0.06, 0.18),
+      swaySpd: rand(1.7, 3.2),
+      chaseAggro: rand(0.35, 0.90),
+      bob: rand(0, Math.PI*2),
+      behavior,
+    });
+  }
+
+  function spawnDashItem(){
+    state.items.push({
+      x: rand(-WORLD.xLimit, WORLD.xLimit),
+      z: rand(0.92, 1.20),
+      wob: rand(0, Math.PI*2)
+    });
   }
 
   // ---------- Input ----------
   window.addEventListener("keydown", (e)=>{
-    if(e.code==="ArrowLeft"){ e.preventDefault(); if(!state.started) startGame(); input.left=true; }
-    if(e.code==="ArrowRight"){ e.preventDefault(); if(!state.started) startGame(); input.right=true; }
-    if(e.code==="ShiftLeft"||e.code==="ShiftRight"){ e.preventDefault(); if(!state.started) startGame(); input.dash=true; }
+    if(e.code==="ArrowLeft"){ e.preventDefault(); if(!state.started) startGame(); input.left=true; input.lastMoveDir=-1; }
+    if(e.code==="ArrowRight"){ e.preventDefault(); if(!state.started) startGame(); input.right=true; input.lastMoveDir=+1; }
     if(e.code==="Space"){ e.preventDefault(); if(!state.started) startGame(); }
     if(e.code==="KeyR"){ e.preventDefault(); reset(); }
+
+    if(e.code==="ShiftLeft"||e.code==="ShiftRight"){
+      e.preventDefault();
+      if(!state.started) startGame();
+      if(!input.dashHeld){ // edge
+        input.dashPressed = true;
+      }
+      input.dashHeld = true;
+    }
   }, {passive:false});
+
   window.addEventListener("keyup", (e)=>{
     if(e.code==="ArrowLeft") input.left=false;
     if(e.code==="ArrowRight") input.right=false;
-    if(e.code==="ShiftLeft"||e.code==="ShiftRight") input.dash=false;
+    if(e.code==="ShiftLeft"||e.code==="ShiftRight") input.dashHeld=false;
   });
 
-  // pointer controls: drag to move smoothly
+  // pointer drag: set targetX smoothly
   canvas.addEventListener("pointerdown", (e)=>{
     e.preventDefault();
     if(!state.started){ startGame(); return; }
@@ -367,22 +396,27 @@
     if(!input.pointerDown) return;
     const dx = e.clientX - input.lastPointerX;
     input.lastPointerX = e.clientX;
-
-    // convert pixel movement to normalized road x
     const rect = canvas.getBoundingClientRect();
     const ndx = dx / rect.width;
-    player.x += ndx * 2.0; // sensitivity
-    player.x = clamp(player.x, -1.0, 1.0);
+
+    // drag -> targetX 변경
+    player.targetX += ndx * 3.0; // sensitivity
+    player.targetX = clamp(player.targetX, -WORLD.xLimit, WORLD.xLimit);
+    input.lastMoveDir = (dx < 0) ? -1 : +1;
   });
 
-  canvas.addEventListener("pointerup", (e)=>{
-    input.pointerDown=false;
-    input.dragging=false;
-  });
-  canvas.addEventListener("pointercancel", ()=>{
-    input.pointerDown=false;
-    input.dragging=false;
-  });
+  canvas.addEventListener("pointerup", ()=>{ input.pointerDown=false; input.dragging=false; });
+  canvas.addEventListener("pointercancel", ()=>{ input.pointerDown=false; input.dragging=false; });
+
+  // two-finger tap => dash (mobile)
+  canvas.addEventListener("touchstart", (e)=>{
+    if(e.touches && e.touches.length === 2){
+      input.twoFingerTap = true;
+      input.dashPressed = true;
+      input.dashHeld = true;
+      setTimeout(()=>{ input.dashHeld=false; input.twoFingerTap=false; }, 80);
+    }
+  }, {passive:true});
 
   ov.addEventListener("pointerdown", (e)=>{
     e.preventDefault();
@@ -390,64 +424,78 @@
     else if(state.over) reset();
   }, {passive:false});
 
-  // ---------- Effects ----------
-  function vibrate(ms){
-    try{ if(navigator.vibrate) navigator.vibrate(ms); }catch{}
-  }
-  function spawnHitParticles(){
-    for(let i=0;i<18;i++){
-      state.particles.push({
-        x: player.x + rand(-0.1,0.1),
-        z: 0.06 + rand(-0.02,0.02),
-        vx: rand(-0.8,0.8),
-        vz: rand(0.35, 1.15),
-        life: rand(0.25, 0.5),
-        t: 0,
-      });
-    }
-  }
-  function spawnPickupParticles(x){
-    for(let i=0;i<14;i++){
-      state.particles.push({
-        x: x + rand(-0.1,0.1),
-        z: 0.10 + rand(0.0,0.05),
-        vx: rand(-0.6,0.6),
-        vz: rand(0.25, 0.8),
-        life: rand(0.22, 0.42),
-        t: 0,
-      });
-    }
+  // ---------- Dash (ROLL) ----------
+  function tryDash(){
+    if(player.dashing) return;
+    if(player.dashCD > 0) return;
+    if(player.dashCharge <= 0) return;
+
+    // dash direction: current input direction 우선
+    let dir = 0;
+    if(input.left && !input.right) dir = -1;
+    else if(input.right && !input.left) dir = +1;
+    else dir = input.lastMoveDir || (player.v>=0 ? +1 : -1);
+
+    const dist = 0.72; // 옆으로 크게 이동(광활지 느낌)
+    const from = player.x;
+    const to = clamp(from + dist*dir, -WORLD.xLimit, WORLD.xLimit);
+
+    player.dashCharge -= 1;
+    player.dashing = true;
+    player.dashT = 0;
+    player.dashFrom = from;
+    player.dashTo = to;
+
+    player.invuln = Math.max(player.invuln, 0.42);
+    player.dashCD = 0.28;
+
+    // damp movement a bit so it feels crisp
+    player.v *= 0.25;
+    player.targetX = to;
+
+    state.shake = 6;
+    beep("dash");
+    vibrate(18);
   }
 
-  // ---------- Collision / gameplay rules ----------
-  // Player "hit zone" is near camera (z<=hitZ). If mob overlaps in x and gets close => hit.
+  // ---------- Collision ----------
   function hitTest(m){
-    const hitZ = 0.095;
+    const hitZ = 0.10;
     if(m.z > hitZ) return false;
-    // x overlap threshold grows as things get closer (scale bigger)
-    const p = project(m.x, clamp(m.z, 0, 1));
-    const thresh = lerp(0.18, 0.32, 1 - clamp(m.z/0.2, 0, 1));
+    // 광활지에서는 충돌 폭 조금 타이트하게
+    const thresh = 0.24;
     return Math.abs(m.x - player.x) < thresh;
   }
 
   function itemTest(it){
-    const hitZ = 0.11;
+    const hitZ = 0.12;
     if(it.z > hitZ) return false;
-    return Math.abs(it.x - player.x) < 0.26;
+    return Math.abs(it.x - player.x) < 0.30;
   }
 
-  function tryDash(){
-    if(player.dashCD > 0) return;
-    if(player.invuln > 0) return;
-    if(player.dashCharge <= 0) return;
-
-    player.dashCharge -= 1;
-    player.invuln = 0.55; // brief i-frames
-    player.dashCD = 0.35;
-
-    state.shake = 6;
-    beep("dash");
-    vibrate(20);
+  function spawnPickupParticles(x){
+    for(let i=0;i<14;i++){
+      state.particles.push({
+        x: x + rand(-0.08,0.08),
+        z: 0.10 + rand(0.0,0.05),
+        vx: rand(-0.6,0.6),
+        vz: rand(0.25, 0.8),
+        life: rand(0.22, 0.42),
+        t: 0
+      });
+    }
+  }
+  function spawnHitParticles(){
+    for(let i=0;i<18;i++){
+      state.particles.push({
+        x: player.x + rand(-0.10,0.10),
+        z: 0.06 + rand(-0.02,0.02),
+        vx: rand(-0.8,0.8),
+        vz: rand(0.35, 1.15),
+        life: rand(0.25, 0.5),
+        t: 0
+      });
+    }
   }
 
   // ---------- Update ----------
@@ -455,118 +503,114 @@
     state.dt = dt;
     state.t += dt;
 
-    // fade banner
-    if(state.chapterBanner > 0){
-      state.chapterBanner = Math.max(0, state.chapterBanner - dt*0.6);
-    }
-
+    if(state.banner > 0) state.banner = Math.max(0, state.banner - dt*0.6);
     state.hitFlash = Math.max(0, state.hitFlash - dt*2.8);
     state.shake = Math.max(0, state.shake - dt*18);
 
-    if(!state.running) return;
+    if(!state.running){
+      // clear edge trigger even if paused
+      input.dashPressed = false;
+      return;
+    }
 
-    // score grows with speed and time
-    state.score += dt * (160 + state.speed*300);
-
-    // difficulty (0..1)
-    state.danger = clamp(state.score / 1600, 0, 1);
-
-    // speed up
+    // score/speed/difficulty
+    state.score += dt * (165 + state.speed*310);
+    state.danger = clamp(state.score/1600, 0, 1);
     state.speed = clamp(state.speed + state.speedGain*dt, 0, state.speedMax);
+    state.spawnEvery = lerp(0.92, 0.48, state.danger);
 
-    // spawn rates up
-    state.spawnEvery = lerp(0.95, 0.50, state.danger);
-
-    // chapter progression
+    // chapters
     state.chapterTime += dt;
-    if(state.chapterTime >= state.chapterLength){
-      setChapter(state.chapterIndex + 1, true);
-    }
+    if(state.chapterTime >= state.chapterLength) setChapter(state.chapterIndex+1, true);
 
-    // background silhouettes spawn more over time
-    if(Math.random() < dt * (0.9 + state.danger*1.8)){
-      spawnBgSilhouette(CHAPTERS[state.chapterIndex].bg);
-    }
+    // bg spawn
+    if(Math.random() < dt * (0.85 + state.danger*1.8)) spawnBgSilhouette(CHAPTERS[state.chapterIndex].bg);
 
-    // occasionally spawn dash item
-    if(Math.random() < dt * (0.10 + (1 - state.danger)*0.08)){
-      spawnDashItem();
-    }
+    // occasional dash item
+    if(Math.random() < dt * (0.10 + (1-state.danger)*0.08)) spawnDashItem();
 
-    // keyboard smooth movement (if not dragging)
+    // movement target from keyboard when not dragging
     if(!input.dragging){
-      const accel = 3.6;           // normalized units per s^2
-      const maxV = 2.2;
-      if(input.left)  player.vx -= accel * dt;
-      if(input.right) player.vx += accel * dt;
-      // friction
-      player.vx *= Math.pow(0.001, dt); // strong damping
-      player.vx = clamp(player.vx, -maxV, maxV);
-      player.x += player.vx * dt;
-      player.x = clamp(player.x, -1.0, 1.0);
-    } else {
-      // if dragging, damp velocity
-      player.vx *= Math.pow(0.001, dt);
+      const step = 1.35; // how fast target moves per second when key held
+      if(input.left)  player.targetX -= step * dt;
+      if(input.right) player.targetX += step * dt;
+      player.targetX = clamp(player.targetX, -WORLD.xLimit, WORLD.xLimit);
     }
 
-    // dash
-    if(input.dash) tryDash();
+    // dash press (edge-trigger) => reliable dash
+    if(input.dashPressed){
+      tryDash();
+      input.dashPressed = false; // consume
+    }
+
+    // cooldowns
     player.dashCD = Math.max(0, player.dashCD - dt);
     player.invuln = Math.max(0, player.invuln - dt);
 
-    // spawn mobs
+    // dash animation (roll + lateral tween)
+    if(player.dashing){
+      player.dashT += dt;
+      const t = clamp(player.dashT / player.dashDur, 0, 1);
+      const e = easeOutCubic(t);
+      player.x = lerp(player.dashFrom, player.dashTo, e);
+
+      // roll: rotate ~ 1 turn
+      player.roll = e * Math.PI * 2 * (player.dashTo > player.dashFrom ? 1 : -1);
+
+      if(t >= 1){
+        player.dashing = false;
+        player.roll = 0;
+        player.x = player.dashTo;
+      }
+    } else {
+      // smooth follow using spring dynamics (very smooth)
+      // critically-damped-ish spring
+      const k = 22;                 // stiffness
+      const c = 2*Math.sqrt(k);     // damping
+      const a = k*(player.targetX - player.x) - c*player.v;
+      player.v += a * dt;
+      player.x += player.v * dt;
+      player.x = clamp(player.x, -WORLD.xLimit, WORLD.xLimit);
+
+      // update lastMoveDir based on velocity
+      if(Math.abs(player.v) > 0.25) input.lastMoveDir = (player.v < 0) ? -1 : +1;
+    }
+
+    // spawns
     state.spawnTimer += dt;
     if(state.spawnTimer >= state.spawnEvery){
       state.spawnTimer = 0;
-
-      // spawn 1..2 mobs depending on danger
       spawnZombie();
-      if(state.danger > 0.45 && Math.random() < 0.33){
-        spawnZombie();
-      }
+      if(state.danger > 0.50 && Math.random() < 0.34) spawnZombie();
     }
 
-    // move mobs toward camera
+    // mobs update
     for(const m of state.mobs){
       m.z -= state.speed * dt;
-
-      // behavior AI (C)
       m.phase += dt * m.swaySpd;
       m.bob += dt * 8;
 
       if(m.behavior === "sway"){
-        const sway = Math.sin(m.phase) * m.swayAmp;
-        m.x += sway * dt;
+        m.x += Math.sin(m.phase) * m.swayAmp * dt;
       } else if(m.behavior === "zigzag"){
-        const sway = Math.sign(Math.sin(m.phase)) * m.swayAmp * 0.75;
-        m.x += sway * dt * 1.8;
-      } else { // chase
-        // steer toward player x
-        const desire = (player.x - m.x) * (0.9 + m.chaseAggro*1.6);
-        m.x += desire * dt * (0.65 + state.danger*0.55);
-        // plus small wobble
-        m.x += Math.sin(m.phase) * m.swayAmp * 0.25 * dt;
+        m.x += Math.sign(Math.sin(m.phase)) * m.swayAmp * dt * 1.8;
+      } else {
+        const desire = (player.x - m.x) * (0.85 + m.chaseAggro*1.8);
+        m.x += desire * dt * (0.60 + state.danger*0.65);
+        m.x += Math.sin(m.phase) * m.swayAmp * 0.22 * dt;
       }
 
-      // keep within road boundaries slightly wider than player
-      m.x = clamp(m.x, -1.05, 1.05);
+      m.x = clamp(m.x, -WORLD.xLimit*1.10, WORLD.xLimit*1.10);
     }
 
-    // move items + bg
-    for(const it of state.items){
-      it.z -= state.speed * dt * 0.95;
-      it.wob += dt * 6;
-    }
-    for(const b of state.bgObjs){
-      b.z -= state.speed * dt * 0.75;
-      b.wob += dt * 1.4;
-    }
+    // items/bg
+    for(const it of state.items){ it.z -= state.speed * dt * 0.95; it.wob += dt*6; }
+    for(const b of state.bgObjs){ b.z -= state.speed * dt * 0.75; b.wob += dt*1.4; }
 
     // particles
     for(const p of state.particles){
       p.t += dt;
       p.x += p.vx * dt;
-      p.z -= state.speed * dt * 0.2; // keep near-ish
       p.z += p.vz * dt;
     }
     state.particles = state.particles.filter(p => p.t < p.life);
@@ -587,11 +631,10 @@
     if(player.invuln <= 0){
       for(const m of state.mobs){
         if(hitTest(m)){
-          // hit => game over (or you can convert to "1 life" later)
           state.hitFlash = 1;
           state.shake = 10;
           beep("hit");
-          vibrate(60);
+          vibrate(65);
           spawnHitParticles();
           gameOver();
           break;
@@ -599,62 +642,72 @@
       }
     }
 
-    // cleanup passed objects
+    // cleanup
     state.mobs = state.mobs.filter(m => m.z > -0.2);
     state.items = state.items.filter(i => i.z > -0.2);
     state.bgObjs = state.bgObjs.filter(b => b.z > -0.25);
   }
 
-  // ---------- Draw ----------
+  // ---------- Draw (INK STYLE) ----------
   function draw(){
-    // camera shake
     const sx = (Math.random()*2-1) * state.shake;
     const sy = (Math.random()*2-1) * state.shake;
 
     ctx.save();
     ctx.translate(sx, sy);
 
-    // base
-    ctx.fillStyle = "#ffffff";
+    // paper background
+    ctx.fillStyle = "#fbfbf8";
     ctx.fillRect(0,0,canvas.width,canvas.height);
+    // tile paper noise
+    for(let y=0;y<canvas.height;y+=paper.height){
+      for(let x=0;x<canvas.width;x+=paper.width){
+        ctx.drawImage(paper, x, y);
+      }
+    }
 
-    drawSky();
-    drawFarSeoul();
-    drawBigSilhouettes(); // A (진짜 배경 오브젝트)
-    drawRoad();
+    drawInkSky();
+    drawInkFarSeoul();
+    drawInkSilhouettes();
+    drawInkGroundPlane();     // 광활지 느낌
     drawItems();
     drawMobs();
     drawPlayer();
     drawParticles();
     drawHUD();
-    drawChapterBanner();
+    drawBanner();
 
-    // hit flash overlay
     if(state.hitFlash > 0){
-      ctx.fillStyle = `rgba(239,68,68,${0.18 * state.hitFlash})`;
+      ctx.fillStyle = `rgba(185,28,28,${0.16 * state.hitFlash})`;
       ctx.fillRect(0,0,canvas.width,canvas.height);
     }
-
-    // vignette
-    ctx.fillStyle = "rgba(15,23,42,0.05)";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
 
     ctx.restore();
   }
 
-  function drawSky(){
-    ctx.fillStyle = "#f4f6fb";
-    ctx.fillRect(0,0,canvas.width,190);
-    ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(0,190,canvas.width,180);
+  function drawInkSky(){
+    // wash gradients (ink wash)
+    const g = ctx.createLinearGradient(0,0,0,320);
+    g.addColorStop(0,"rgba(148,163,184,0.18)");
+    g.addColorStop(1,"rgba(148,163,184,0.02)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,canvas.width,320);
 
-    // simple clouds
-    ctx.fillStyle = "rgba(203,213,225,0.55)";
-    cloud(140, 86, 1.2);
-    cloud(360, 64, 0.95);
-    cloud(780, 88, 1.1);
+    // mist band
+    const m = ctx.createLinearGradient(0,170,0,310);
+    m.addColorStop(0,"rgba(255,255,255,0.0)");
+    m.addColorStop(0.5,"rgba(255,255,255,0.55)");
+    m.addColorStop(1,"rgba(255,255,255,0.0)");
+    ctx.fillStyle = m;
+    ctx.fillRect(0,130,canvas.width,220);
 
-    function cloud(x,y,s){
+    // a few ink clouds
+    ctx.fillStyle = "rgba(30,41,59,0.06)";
+    inkCloud(160, 88, 1.2);
+    inkCloud(380, 72, 0.95);
+    inkCloud(760, 92, 1.1);
+
+    function inkCloud(x,y,s){
       ctx.save();
       ctx.translate(x,y);
       ctx.scale(s,s);
@@ -668,194 +721,143 @@
     }
   }
 
-  function drawFarSeoul(){
-    // distant skyline blocks
-    ctx.fillStyle = "#e9edf7";
+  function drawInkFarSeoul(){
+    // distant skyline made of brush blocks
     const baseY = 238;
-    let x = -50;
-    while (x < canvas.width+70){
-      const w = 60 + ((x*17)%50+50)%50;
-      const h = 24 + ((x*13)%62+62)%62;
-      ctx.fillRect(x, baseY - h, w, h);
-      x += w + 18;
+    for(let i=0;i<22;i++){
+      const x = i*52 + rand(-8,8);
+      const w = 40 + rand(-6,10);
+      const h = 24 + (i%5)*10 + rand(-6,12);
+      inkFillRect(x, baseY-h, w, h, 0.06);
     }
 
-    // distant namsan hint
-    ctx.fillStyle = "#dfe6f4";
-    ctx.fillRect(720, baseY - 110, 10, 110);
-    ctx.beginPath(); ctx.roundRect(705, baseY - 145, 40, 34, 10); ctx.fill();
-    ctx.fillRect(724, baseY - 168, 3, 23);
+    // distant tower stroke
+    const pts = [
+      {x:720,y:baseY-110},
+      {x:726,y:baseY-12},
+    ];
+    inkStrokePath(pts, 8, 0.08);
   }
 
-  function drawRoad(){
-    const hY = ROAD.horizonY;
-    const nY = ROAD.nearY;
+  function drawInkGroundPlane(){
+    // huge ground polygon with soft washes
+    const hY = WORLD.horizonY + 40;
+    const nY = WORLD.nearY;
 
-    // road polygon
-    ctx.fillStyle = "#eef2ff";
+    // main plane
+    ctx.save();
+    ctx.fillStyle = "rgba(30,41,59,0.03)";
     ctx.beginPath();
-    ctx.moveTo(ROAD.centerX - ROAD.widthFar/2, hY);
-    ctx.lineTo(ROAD.centerX + ROAD.widthFar/2, hY);
-    ctx.lineTo(ROAD.centerX + ROAD.widthNear/2, nY);
-    ctx.lineTo(ROAD.centerX - ROAD.widthNear/2, nY);
+    ctx.moveTo(0, hY);
+    ctx.lineTo(canvas.width, hY);
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.lineTo(0, canvas.height);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
 
-    // edges
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(ROAD.centerX - ROAD.widthFar/2, hY);
-    ctx.lineTo(ROAD.centerX - ROAD.widthNear/2, nY);
-    ctx.moveTo(ROAD.centerX + ROAD.widthFar/2, hY);
-    ctx.lineTo(ROAD.centerX + ROAD.widthNear/2, nY);
-    ctx.stroke();
-
-    // lane guide lines (just visual, no fixed lanes in gameplay now)
-    drawDivider(-0.33);
-    drawDivider( 0.33);
-
-    function drawDivider(nx){
-      const dashCount = 14;
-      for(let i=0;i<dashCount;i++){
-        const phase = (state.t * state.speed * 0.58) % 1;
-        const zz = (i/dashCount + phase) % 1;
-        const a = project(nx, zz);
-        const b = project(nx, clamp(zz + 0.06, 0, 1));
-        ctx.strokeStyle = "rgba(148,163,184,0.55)";
-        ctx.lineWidth = Math.max(1.2, a.scale*2.1);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
+    // subtle “flow lines” to indicate forward motion (no lanes)
+    for(let i=0;i<9;i++){
+      const z = (i/9 + (state.t*state.speed*0.40)%1) % 1;
+      const y = lerp(nY, hY, z);
+      const a = lerp(0.06, 0.00, z);
+      ctx.fillStyle = `rgba(15,23,42,${a})`;
+      ctx.fillRect(0, y, canvas.width, 1);
     }
+
+    // faint central path (not a road, just a worn field)
+    ctx.save();
+    const path = ctx.createLinearGradient(0, hY, 0, nY);
+    path.addColorStop(0,"rgba(15,23,42,0.00)");
+    path.addColorStop(1,"rgba(15,23,42,0.04)");
+    ctx.fillStyle = path;
+    ctx.beginPath();
+    ctx.moveTo(WORLD.cx - WORLD.widthFar*0.22, hY);
+    ctx.lineTo(WORLD.cx + WORLD.widthFar*0.22, hY);
+    ctx.lineTo(WORLD.cx + WORLD.widthNear*0.26, nY);
+    ctx.lineTo(WORLD.cx - WORLD.widthNear*0.26, nY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
-  // A: real big silhouettes by chapter, placed on sides / skyline and coming toward you
-  function drawBigSilhouettes(){
-    // draw far->near (sort by z desc)
+  function drawInkSilhouettes(){
     const list = [...state.bgObjs].sort((a,b)=>b.z-a.z);
-
     for(const o of list){
-      const z = clamp(o.z, 0, 1);
+      const z = clamp(o.z,0,1);
       const p = project(o.xNorm, z);
-      const s = p.scale * 2.2; // big
-
-      // fade in as approaching
-      const fade = clamp((1 - z) * 1.15, 0, 1);
+      const s = p.scale * 2.4;
+      const fade = clamp((1-z)*1.2, 0, 1);
 
       ctx.save();
-      ctx.globalAlpha = 0.80 * fade;
+      ctx.globalAlpha = fade*0.65;
       ctx.translate(p.x, p.y);
       ctx.scale(s, s);
 
-      // silhouette color changes a bit by chapter mood (subtle)
-      ctx.fillStyle = "#dfe6f4";
-      ctx.strokeStyle = "#d7deee";
-      ctx.lineWidth = 2;
-
+      // draw with strokes + washes
       switch(o.kind){
-        case "hospital": drawHospitalSil(); break;
-        case "gwang": drawGwangSil(); break;
-        case "hangang": drawBridgeSil(); break;
-        case "namsan": drawTowerSil(); break;
-        case "subway": drawSubwaySil(); break;
-        case "palace": drawPalaceSil(); break;
-        default: drawTowerSil();
+        case "hospital": drawSilHospital(); break;
+        case "gwang": drawSilGwang(); break;
+        case "hangang": drawSilBridge(); break;
+        case "namsan": drawSilTower(); break;
+        case "subway": drawSilSubway(); break;
+        case "palace": drawSilPalace(); break;
+        default: drawSilTower();
       }
 
       ctx.restore();
       ctx.globalAlpha = 1;
     }
 
-    function drawHospitalSil(){
-      // big block + ER sign
-      ctx.beginPath(); ctx.roundRect(-110, -90, 220, 130, 18); ctx.fill();
-      ctx.fillStyle = "#d7deee";
-      ctx.beginPath(); ctx.roundRect(-90, -70, 60, 100, 16); ctx.fill();
-      ctx.beginPath(); ctx.roundRect( 30, -70, 60, 100, 16); ctx.fill();
-      ctx.fillStyle = "#cbd5e1";
-      ctx.beginPath(); ctx.roundRect(-52, -40, 104, 70, 14); ctx.fill();
-      ctx.fillStyle = "#dfe6f4";
-      ctx.font = "900 18px system-ui";
-      ctx.fillText("ER", -18, 5);
+    function drawSilHospital(){
+      // wash
+      ctx.fillStyle="rgba(15,23,42,0.06)";
+      ctx.beginPath(); ctx.roundRect(-120,-90,240,130,18); ctx.fill();
+      // strokes
+      inkStrokePath([{x:-120,y:-90},{x:120,y:-90},{x:120,y:40},{x:-120,y:40},{x:-120,y:-90}], 5, 0.09);
+      inkStrokePath([{x:-30,y:-90},{x:-30,y:40}], 4, 0.08);
+      inkStrokePath([{x:30,y:-90},{x:30,y:40}], 4, 0.08);
     }
-    function drawGwangSil(){
-      // arch + roof
-      ctx.beginPath(); ctx.roundRect(-120, -60, 240, 90, 16); ctx.fill();
-      ctx.fillStyle = "#d7deee";
-      ctx.beginPath();
-      ctx.moveTo(-136, -60); ctx.lineTo(0, -116); ctx.lineTo(136, -60);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#cbd5e1";
-      ctx.fillRect(-80, -30, 160, 20);
-      ctx.fillStyle = "#dfe6f4";
-      ctx.fillRect(-70, -10, 140, 40);
-      ctx.fillStyle = "#cbd5e1";
-      ctx.fillRect(-20, 6, 40, 24);
+    function drawSilGwang(){
+      ctx.fillStyle="rgba(15,23,42,0.06)";
+      ctx.beginPath(); ctx.roundRect(-140,-60,280,90,16); ctx.fill();
+      inkStrokePath([{x:-150,y:-60},{x:0,y:-122},{x:150,y:-60}], 6, 0.10);
+      inkStrokePath([{x:-140,y:-60},{x:140,y:-60},{x:140,y:30},{x:-140,y:30},{x:-140,y:-60}], 5, 0.09);
     }
-    function drawBridgeSil(){
-      ctx.strokeStyle = "#cbd5e1";
-      ctx.lineWidth = 10;
+    function drawSilBridge(){
+      ctx.strokeStyle="rgba(15,23,42,0.10)";
+      ctx.lineWidth=8;
       ctx.beginPath();
-      ctx.moveTo(-140, 20);
-      ctx.quadraticCurveTo(0, -90, 140, 20);
+      ctx.moveTo(-160,20);
+      ctx.quadraticCurveTo(0,-96,160,20);
       ctx.stroke();
-      ctx.strokeStyle = "#d7deee";
-      ctx.lineWidth = 14;
-      ctx.beginPath(); ctx.moveTo(-160, 20); ctx.lineTo(160, 20); ctx.stroke();
-      ctx.fillStyle = "#cbd5e1";
-      ctx.fillRect(-120, 20, 18, 70);
-      ctx.fillRect( 102, 20, 18, 70);
+      // deck
+      ctx.strokeStyle="rgba(15,23,42,0.08)";
+      ctx.lineWidth=10;
+      ctx.beginPath(); ctx.moveTo(-180,20); ctx.lineTo(180,20); ctx.stroke();
     }
-    function drawTowerSil(){
-      ctx.fillRect(-10, -140, 20, 190);
-      ctx.fillStyle = "#cbd5e1";
-      ctx.beginPath(); ctx.roundRect(-55, -170, 110, 60, 18); ctx.fill();
-      ctx.fillStyle = "#d7deee";
-      ctx.fillRect(-3, -210, 6, 40);
-      // hill
-      ctx.fillStyle = "#e2e8f0";
-      ctx.beginPath();
-      ctx.moveTo(-170, 90);
-      ctx.quadraticCurveTo(0, -20, 170, 90);
-      ctx.closePath();
-      ctx.fill();
+    function drawSilTower(){
+      ctx.fillStyle="rgba(15,23,42,0.05)";
+      ctx.fillRect(-10,-160,20,220);
+      inkStrokePath([{x:0,y:-180},{x:0,y:60}], 7, 0.10);
+      ctx.fillStyle="rgba(15,23,42,0.06)";
+      ctx.beginPath(); ctx.roundRect(-60,-190,120,60,18); ctx.fill();
+      inkStrokePath([{x:-60,y:-190},{x:60,y:-190},{x:60,y:-130},{x:-60,y:-130},{x:-60,y:-190}], 5, 0.09);
     }
-    function drawSubwaySil(){
-      ctx.fillStyle = "#dfe6f4";
-      ctx.beginPath(); ctx.roundRect(-120, -90, 240, 160, 30); ctx.fill();
-      ctx.fillStyle = "#cbd5e1";
-      ctx.beginPath(); ctx.roundRect(-90, -60, 180, 70, 22); ctx.fill();
-      ctx.fillStyle = "#dfe6f4";
-      ctx.fillRect(-120, 40, 240, 18);
-      ctx.fillStyle = "#cbd5e1";
-      ctx.beginPath(); ctx.arc(-70, 80, 18, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc( 70, 80, 18, 0, Math.PI*2); ctx.fill();
+    function drawSilSubway(){
+      ctx.fillStyle="rgba(15,23,42,0.06)";
+      ctx.beginPath(); ctx.roundRect(-140,-90,280,170,30); ctx.fill();
+      inkStrokePath([{x:-140,y:-90},{x:140,y:-90},{x:140,y:80},{x:-140,y:80},{x:-140,y:-90}], 6, 0.10);
     }
-    function drawPalaceSil(){
-      ctx.fillStyle = "#dfe6f4";
-      ctx.fillRect(-160, 10, 320, 26);
-      ctx.fillStyle = "#cbd5e1";
-      ctx.beginPath();
-      ctx.moveTo(-170, 10);
-      ctx.lineTo(0, -80);
-      ctx.lineTo(170, 10);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#d7deee";
-      ctx.fillRect(-110, -10, 220, 16);
-      ctx.fillStyle = "#dfe6f4";
-      ctx.fillRect(-120, 0, 40, 70);
-      ctx.fillRect( 80, 0, 40, 70);
-      ctx.fillStyle = "#cbd5e1";
-      ctx.fillRect(-18, 12, 36, 46);
+    function drawSilPalace(){
+      ctx.fillStyle="rgba(15,23,42,0.06)";
+      ctx.fillRect(-170,10,340,26);
+      inkStrokePath([{x:-180,y:10},{x:0,y:-86},{x:180,y:10}], 6, 0.10);
+      inkStrokePath([{x:-170,y:10},{x:170,y:10},{x:170,y:36},{x:-170,y:36},{x:-170,y:10}], 5, 0.08);
     }
   }
 
   function drawItems(){
-    // far->near
     const list = [...state.items].sort((a,b)=>b.z-a.z);
     for(const it of list){
       const p = project(it.x, clamp(it.z,0,1));
@@ -866,18 +868,17 @@
       ctx.translate(p.x, p.y + bob);
       ctx.scale(s, s);
 
-      // glow
-      ctx.fillStyle = "rgba(59,130,246,0.16)";
-      ctx.beginPath(); ctx.ellipse(0, 18, 34, 10, 0, 0, Math.PI*2); ctx.fill();
+      // brushy glow
+      ctx.fillStyle = "rgba(37,99,235,0.14)";
+      ctx.beginPath(); ctx.ellipse(0, 18, 38, 12, 0, 0, Math.PI*2); ctx.fill();
 
-      // battery icon (dash charge)
-      ctx.fillStyle = "#3b82f6";
+      // ink battery
+      ctx.fillStyle = "rgba(15,23,42,0.10)";
       ctx.beginPath(); ctx.roundRect(-16, -30, 32, 42, 10); ctx.fill();
-      ctx.fillStyle = "#e5e7eb";
-      ctx.fillRect(-6, -38, 12, 8);
-      ctx.fillStyle = "#111827";
-      ctx.font = "900 12px system-ui";
-      ctx.fillText("D", -5, -4);
+      inkStrokePath([{x:-16,y:-30},{x:16,y:-30},{x:16,y:12},{x:-16,y:12},{x:-16,y:-30}], 3, 0.16);
+
+      ctx.fillStyle = "rgba(37,99,235,0.22)";
+      ctx.fillRect(-10,-22,20,28);
 
       ctx.restore();
     }
@@ -885,14 +886,11 @@
 
   function drawMobs(){
     const list = [...state.mobs].sort((a,b)=>b.z-a.z);
-    for(const m of list){
-      drawZombie(m);
-    }
+    for(const m of list) drawZombie(m);
   }
 
   function drawZombie(m){
-    const z = clamp(m.z,0,1);
-    const p = project(m.x, z);
+    const p = project(m.x, clamp(m.z,0,1));
     const s = p.scale * 1.20;
     const bob = Math.sin(m.bob)*2;
 
@@ -900,125 +898,97 @@
     ctx.translate(p.x, p.y + bob);
     ctx.scale(s, s);
 
-    // shadow
-    ctx.fillStyle = "rgba(0,0,0,0.12)";
-    ctx.beginPath();
-    ctx.ellipse(0, 20, 30, 9, 0, 0, Math.PI*2);
-    ctx.fill();
+    // shadow wash
+    ctx.fillStyle = "rgba(15,23,42,0.10)";
+    ctx.beginPath(); ctx.ellipse(0, 22, 32, 10, 0, 0, Math.PI*2); ctx.fill();
 
-    // body
-    ctx.fillStyle = "#16a34a";
-    ctx.beginPath(); ctx.roundRect(-22, -78, 44, 78, 12); ctx.fill();
+    // ink body (washed)
+    ctx.fillStyle = "rgba(34,197,94,0.16)";
+    ctx.beginPath(); ctx.roundRect(-22,-78,44,78,12); ctx.fill();
+    ctx.fillStyle = "rgba(34,197,94,0.18)";
+    ctx.beginPath(); ctx.roundRect(-20,-114,40,38,12); ctx.fill();
 
-    // head
-    ctx.fillStyle = "#22c55e";
-    ctx.beginPath(); ctx.roundRect(-20, -114, 40, 38, 12); ctx.fill();
+    // outline strokes
+    inkStrokePath([{x:-22,y:-78},{x:22,y:-78},{x:22,y:0},{x:-22,y:0},{x:-22,y:-78}], 3.2, 0.18);
+    inkStrokePath([{x:-20,y:-114},{x:20,y:-114},{x:20,y:-76},{x:-20,y:-76},{x:-20,y:-114}], 3.2, 0.18);
 
-    // eyes
-    ctx.fillStyle = "#111827";
-    dot(-8, -96, 3);
-    dot( 8, -96, 3);
+    // eyes (ink dots)
+    ctx.fillStyle = "rgba(15,23,42,0.55)";
+    ctx.beginPath(); ctx.arc(-8,-96,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 8,-96,3,0,Math.PI*2); ctx.fill();
 
-    // mouth
-    ctx.strokeStyle = "#111827";
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(-10, -84); ctx.lineTo(10, -84); ctx.stroke();
+    // mouth stroke
+    inkStrokePath([{x:-10,y:-84},{x:10,y:-84}], 3.4, 0.20);
 
-    // arms (animated)
-    const swing = Math.sin(state.t*10 + m.phase) * 6;
-    ctx.fillStyle = "#15803d";
-    ctx.beginPath(); ctx.roundRect(-40, -60 + swing*0.2, 20, 10, 6); ctx.fill();
-    ctx.beginPath(); ctx.roundRect( 20, -52 - swing*0.2, 20, 10, 6); ctx.fill();
-
-    // accessories
+    // accessories minimal
     if(m.type.style==="hat"){
-      ctx.fillStyle="#111827";
+      ctx.fillStyle="rgba(15,23,42,0.18)";
       ctx.beginPath(); ctx.ellipse(0,-118,32,6,0,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.roundRect(-14,-140,28,22,10); ctx.fill();
+      inkStrokePath([{x:-32,y:-118},{x:32,y:-118}], 3.2, 0.20);
     } else if(m.type.style==="mask"){
-      ctx.fillStyle="#e5e7eb";
-      ctx.beginPath(); ctx.roundRect(-18,-90,36,16,8); ctx.fill();
-      ctx.strokeStyle="rgba(17,24,39,0.35)";
-      ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(-18,-82); ctx.lineTo(18,-82); ctx.stroke();
-    } else if(m.type.style==="nurse"){
-      ctx.fillStyle="#e5e7eb";
-      ctx.beginPath(); ctx.roundRect(-18,-136,36,18,8); ctx.fill();
-      ctx.fillStyle="#ef4444";
-      ctx.fillRect(-3,-132,6,10);
-      ctx.fillRect(-8,-127,16,6);
-    } else if(m.type.style==="runner"){
-      ctx.fillStyle="#3b82f6";
-      ctx.beginPath(); ctx.roundRect(-20,-106,40,10,8); ctx.fill();
+      ctx.fillStyle="rgba(15,23,42,0.08)";
+      ctx.beginPath(); ctx.roundRect(-18,-92,36,16,8); ctx.fill();
+      inkStrokePath([{x:-18,y:-92},{x:18,y:-92},{x:18,y:-76},{x:-18,y:-76},{x:-18,y:-92}], 2.6, 0.16);
     }
-
-    // feet
-    ctx.fillStyle="#065f46";
-    ctx.beginPath(); ctx.roundRect(-18,-6,16,10,5); ctx.fill();
-    ctx.beginPath(); ctx.roundRect( 2,-6,16,10,5); ctx.fill();
 
     ctx.restore();
   }
 
   function drawPlayer(){
-    // always near camera, projected with near z
-    const p = project(player.x*0.92, 0.04);
+    const p = project(player.x*0.90, 0.04);
     const s = 1.12;
 
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.scale(s, s);
 
-    // invuln glow
+    // roll dash rotation around center
+    if(player.dashing){
+      ctx.rotate(player.roll);
+    }
+
+    // invuln aura (ink-blue wash)
     if(player.invuln>0){
-      ctx.fillStyle = `rgba(59,130,246,${0.18 + 0.22*Math.sin(state.t*24)})`;
-      ctx.beginPath();
-      ctx.ellipse(0, 14, 38, 18, 0, 0, Math.PI*2);
-      ctx.fill();
+      ctx.fillStyle = `rgba(37,99,235,${0.10 + 0.12*Math.sin(state.t*24)})`;
+      ctx.beginPath(); ctx.ellipse(0, 12, 44, 20, 0, 0, Math.PI*2); ctx.fill();
     }
 
     // shadow
-    ctx.fillStyle = "rgba(0,0,0,0.14)";
-    ctx.beginPath(); ctx.ellipse(0, 24, 32, 9, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "rgba(15,23,42,0.12)";
+    ctx.beginPath(); ctx.ellipse(0, 24, 34, 10, 0, 0, Math.PI*2); ctx.fill();
 
-    // body
-    ctx.fillStyle = "#111827";
+    // body wash
+    ctx.fillStyle = "rgba(15,23,42,0.10)";
     ctx.beginPath(); ctx.roundRect(-18,-74,36,64,14); ctx.fill();
 
-    // shirt
-    ctx.fillStyle = "#f8fafc";
+    // shirt wash
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.beginPath(); ctx.roundRect(-16,-54,32,36,10); ctx.fill();
 
-    // head
-    ctx.fillStyle = "#f2c9a0";
+    // head wash
+    ctx.fillStyle = "rgba(244,203,159,0.55)";
     ctx.beginPath(); ctx.roundRect(-16,-108,32,36,14); ctx.fill();
 
-    // hair
-    ctx.fillStyle = "#111827";
+    // outlines (brush strokes)
+    inkStrokePath([{x:-18,y:-74},{x:18,y:-74},{x:18,y:-10},{x:-18,y:-10},{x:-18,y:-74}], 3.4, 0.22);
+    inkStrokePath([{x:-16,y:-108},{x:16,y:-108},{x:16,y:-72},{x:-16,y:-72},{x:-16,y:-108}], 3.0, 0.20);
+
+    // hair stroke
+    ctx.fillStyle = "rgba(15,23,42,0.18)";
     ctx.beginPath(); ctx.roundRect(-16,-110,32,18,12); ctx.fill();
+    inkStrokePath([{x:-16,y:-110},{x:16,y:-110},{x:16,y:-92},{x:-16,y:-92},{x:-16,y:-110}], 2.8, 0.18);
 
     // eyes
-    ctx.fillStyle = "#111827";
-    dot(-6, -94, 2.4); dot(6, -94, 2.4);
+    ctx.fillStyle="rgba(15,23,42,0.55)";
+    ctx.beginPath(); ctx.arc(-6,-94,2.2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 6,-94,2.2,0,Math.PI*2); ctx.fill();
 
-    // mouth
-    ctx.strokeStyle = "rgba(17,24,39,0.45)";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(-4,-86); ctx.lineTo(4,-86); ctx.stroke();
-
-    // arms & legs
-    const walk = state.running ? Math.sin(state.t*10)*5 : 0;
-    ctx.fillStyle = "#111827";
-    ctx.beginPath(); ctx.roundRect(-28,-52 + walk,12,30,8); ctx.fill();
-    ctx.beginPath(); ctx.roundRect( 16,-52 - walk,12,30,8); ctx.fill();
-
+    // legs
+    ctx.fillStyle="rgba(15,23,42,0.10)";
     ctx.beginPath(); ctx.roundRect(-14,-10,12,28,8); ctx.fill();
     ctx.beginPath(); ctx.roundRect( 2,-10,12,28,8); ctx.fill();
-
-    // shoes
-    ctx.fillStyle = "#0f172a";
-    ctx.beginPath(); ctx.roundRect(-16, 16, 16, 8, 5); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(0, 16, 16, 8, 5); ctx.fill();
+    inkStrokePath([{x:-14,y:-10},{x:-2,y:-10},{x:-2,y:18},{x:-14,y:18},{x:-14,y:-10}], 2.6, 0.18);
+    inkStrokePath([{x:2,y:-10},{x:14,y:-10},{x:14,y:18},{x:2,y:18},{x:2,y:-10}], 2.6, 0.18);
 
     ctx.restore();
   }
@@ -1027,14 +997,11 @@
     for(const p of state.particles){
       const a = 1 - (p.t/p.life);
       const pr = project(p.x, clamp(p.z,0,1));
-      const s = pr.scale * 0.6;
       ctx.save();
-      ctx.globalAlpha = a * 0.85;
-      ctx.translate(pr.x, pr.y);
-      ctx.scale(s, s);
-      ctx.fillStyle = "#cbd5e1";
+      ctx.globalAlpha = a * 0.6;
+      ctx.fillStyle = "rgba(15,23,42,0.20)";
       ctx.beginPath();
-      ctx.arc(0, 0, 6, 0, Math.PI*2);
+      ctx.arc(pr.x, pr.y, 4 + (1-a)*4, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
       ctx.globalAlpha = 1;
@@ -1043,55 +1010,53 @@
 
   function drawHUD(){
     ctx.save();
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = "rgba(15,23,42,0.85)";
     ctx.font = "900 18px system-ui,-apple-system,'Noto Sans KR',Arial";
     ctx.fillText(`SCORE ${Math.floor(state.score)}`, 18, 30);
 
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = "rgba(15,23,42,0.55)";
     ctx.font = "900 13px system-ui,-apple-system,'Noto Sans KR',Arial";
     ctx.fillText(`HI ${state.hi}`, 18, 52);
 
-    // dash
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = "rgba(15,23,42,0.85)";
     ctx.font = "900 13px system-ui,-apple-system,'Noto Sans KR',Arial";
     ctx.fillText(`DASH ${player.dashCharge}/2`, 18, 74);
 
-    // chapter label
     const c = CHAPTERS[state.chapterIndex];
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = "rgba(15,23,42,0.45)";
     ctx.font = "900 12px system-ui,-apple-system,'Noto Sans KR',Arial";
     ctx.fillText(`${c.name} · 난이도 ${Math.floor(state.danger*100)}%`, 18, 94);
 
     ctx.restore();
   }
 
-  function drawChapterBanner(){
-    if(state.chapterBanner <= 0) return;
-    const a = smooth01(clamp(state.chapterBanner,0,1));
+  function drawBanner(){
+    if(state.banner <= 0) return;
+    const a = smooth01(clamp(state.banner,0,1));
     ctx.save();
     ctx.globalAlpha = a;
 
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.strokeStyle = "rgba(203,213,225,0.9)";
-    ctx.lineWidth = 2;
+    // ink wash label
+    ctx.fillStyle = "rgba(255,255,255,0.78)";
+    ctx.beginPath();
+    ctx.roundRect(canvas.width/2-170, 84, 340, 56, 18);
+    ctx.fill();
 
-    const w = 320, h = 54;
-    const x = canvas.width/2 - w/2;
-    const y = 92;
+    inkStrokePath([
+      {x:canvas.width/2-170,y:84},{x:canvas.width/2+170,y:84},
+      {x:canvas.width/2+170,y:140},{x:canvas.width/2-170,y:140},
+      {x:canvas.width/2-170,y:84}
+    ], 3, 0.18);
 
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 16); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = "rgba(15,23,42,0.85)";
     ctx.font = "900 18px system-ui,-apple-system,'Noto Sans KR',Arial";
-    ctx.fillText(state.bannerText, canvas.width/2 - ctx.measureText(state.bannerText).width/2, y+34);
+    const t = state.bannerText;
+    ctx.fillText(t, canvas.width/2 - ctx.measureText(t).width/2, 118);
 
     ctx.restore();
   }
 
-  function dot(x,y,r){
-    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-  }
-
-  // ---------- Main loop ----------
+  // ---------- Loop ----------
   function loop(ts){
     if(!state.last) state.last = ts;
     const dt = clamp((ts - state.last)/1000, 0, 0.033);
@@ -1103,9 +1068,17 @@
     requestAnimationFrame(loop);
   }
 
-  // ---------- Start ----------
+  // ---------- Boot ----------
   reset();
   requestAnimationFrame(loop);
+
+  // ---------- Actions that need audio gesture ----------
+  // dash should also start audio on first gesture if not started yet
+  document.addEventListener("pointerdown", ()=>{
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch{}
+    }
+  }, {once:true});
 })();
 </script>
 </body>
