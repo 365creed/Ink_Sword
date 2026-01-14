@@ -497,4 +497,487 @@
     if(state.flash>0){
       ctx.save();
       ctx.fillStyle = INK(0.18*state.flash);
-      ctx.fillRect(0,0,canvas.width,canvas.height)
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
+    }
+  }
+
+  function drawTerrainWashes(){
+    // big moving wash band (gives “living paper” feel)
+    const t = state.t*0.06;
+    for(let i=0;i<5;i++){
+      const x = (Math.sin(t + i*1.3)*0.5+0.5) * WORLD.w;
+      const y = (Math.cos(t*1.2 + i*0.9)*0.5+0.5) * WORLD.h;
+      ctx.fillStyle = INK(0.03);
+      ctx.beginPath();
+      ctx.ellipse(x, y, 420, 260, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawLandmarks(){
+    // 간단하지만 “수묵” 분위기 주는 상징 오브젝트들(검정만)
+    // 1) 큰 문(광화문 느낌)
+    inkGate(420, 820, 1.2);
+    // 2) 산세(남산 느낌)
+    inkMountain(1900, 1100, 1.4);
+    // 3) 다리(한강 느낌)
+    inkBridge(520, 2600, 1.4);
+    // 4) 궁 지붕
+    inkRoof(1700, 3600, 1.5);
+  }
+
+  function inkGate(x,y,s){
+    ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+    ctx.fillStyle = INK(0.06);
+    ctx.fillRect(-170,-10,340,36);
+    brushStroke([{x:-190,y:-10},{x:0,y:-120},{x:190,y:-10}], 12, 0.12);
+    brushStroke([{x:-170,y:0},{x:170,y:0}], 10, 0.12);
+    brushStroke([{x:-120,y:0},{x:-120,y:170}], 12, 0.12);
+    brushStroke([{x:120,y:0},{x:120,y:170}], 12, 0.12);
+    ctx.restore();
+  }
+  function inkMountain(x,y,s){
+    ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+    const pts=[];
+    for(let i=0;i<=12;i++){
+      pts.push({x:-220 + i*(440/12), y: 40 + Math.sin(i*0.8 + state.t*0.2)*40 + (i%3)*12});
+    }
+    brushStroke(pts, 16, 0.10);
+    ctx.fillStyle = INK(0.04);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(const p of pts) ctx.lineTo(p.x,p.y);
+    ctx.lineTo(220, 220); ctx.lineTo(-220,220);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function inkBridge(x,y,s){
+    ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+    brushStroke([{x:-260,y:60},{x:0,y:-80},{x:260,y:60}], 14, 0.10);
+    brushStroke([{x:-300,y:60},{x:300,y:60}], 16, 0.10);
+    ctx.restore();
+  }
+  function inkRoof(x,y,s){
+    ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+    brushStroke([{x:-220,y:30},{x:0,y:-100},{x:220,y:30}], 14, 0.11);
+    brushStroke([{x:-200,y:30},{x:200,y:30}], 12, 0.11);
+    brushStroke([{x:-160,y:30},{x:-160,y:140}], 12, 0.11);
+    brushStroke([{x:160,y:30},{x:160,y:140}], 12, 0.11);
+    ctx.restore();
+  }
+
+  function drawPlayer(){
+    // player silhouette + sword (black only), strong brush lines
+    const x=player.x, y=player.y;
+
+    // aura when guarding/parry
+    if(player.guarding){
+      ctx.fillStyle = INK(0.05);
+      ctx.beginPath(); ctx.ellipse(x, y-20, 70, 48, 0, 0, Math.PI*2); ctx.fill();
+    }
+    if(player.invuln>0){
+      ctx.fillStyle = INK(0.04);
+      ctx.beginPath(); ctx.ellipse(x, y-20, 90, 60, 0, 0, Math.PI*2); ctx.fill();
+    }
+
+    // shadow
+    ctx.fillStyle = INK(0.10);
+    ctx.beginPath(); ctx.ellipse(x, y+12, 52, 16, 0, 0, Math.PI*2); ctx.fill();
+
+    // body wash
+    ctx.fillStyle = INK(0.10);
+    ctx.beginPath(); roundRect(x-18,y-86,36,72,14); ctx.fill();
+    ctx.beginPath(); roundRect(x-16,y-124,32,36,14); ctx.fill();
+
+    // outline
+    brushStroke([{x:x-18,y:y-86},{x:x+18,y:y-86},{x:x+18,y:y-14},{x:x-18,y:y-14},{x:x-18,y:y-86}], 6, 0.18);
+    brushStroke([{x:x-16,y:y-124},{x:x+16,y:y-124},{x:x+16,y:y-88},{x:x-16,y:y-88},{x:x-16,y:y-124}], 5, 0.16);
+
+    // sword direction
+    const fx = player.face.x || 0;
+    const fy = player.face.y || -1;
+    const sx = x + fx*18, sy = y-64 + fy*6;
+    brushStroke([{x:sx, y:sy}, {x:sx + fx*70, y:sy + fy*70}], 8, 0.18);
+    brushStroke([{x:sx, y:sy}, {x:sx - fy*20, y:sy + fx*20}], 8, 0.12);
+
+    // slash arc
+    if(player.slashing){
+      const t = player.slashT/player.slashDur;
+      const a = clamp(1-t, 0, 1);
+      const arcPts=[];
+      const R=120;
+      const baseAng = Math.atan2(fy, fx);
+      const start = baseAng - 1.2;
+      const end = baseAng + 1.2;
+      for(let i=0;i<=10;i++){
+        const u=i/10;
+        const ang = lerp(start, end, u);
+        arcPts.push({x:x + Math.cos(ang)*R, y:(y-70) + Math.sin(ang)*R*0.7});
+      }
+      brushStroke(arcPts, 18, 0.14*a);
+      splatter(x + fx*60, y-60, 0.6*a);
+    }
+  }
+
+  function drawEnemy(e){
+    const x=e.x, y=e.y;
+
+    // ghost fades
+    let alpha = 0.14;
+    if(e.type.kind==="ghost"){
+      alpha = 0.10 + 0.04*(Math.sin(state.t*3 + e.teleT)*0.5+0.5);
+      e.teleT += state.dt*2;
+    }
+
+    // shadow
+    ctx.fillStyle = INK(0.10);
+    ctx.beginPath(); ctx.ellipse(x, y+12, 50, 16, 0, 0, Math.PI*2); ctx.fill();
+
+    // body wash
+    ctx.fillStyle = INK(alpha + (e.type.kind==="gate"?0.03:0));
+    ctx.beginPath(); roundRect(x-20,y-92,40,78,14); ctx.fill();
+    ctx.beginPath(); roundRect(x-18,y-132,36,40,14); ctx.fill();
+
+    // outline heavier for gatekeeper/wraith
+    const w = (e.type.kind==="gate") ? 8 : (e.type.kind==="wraith" ? 7 : 6);
+    brushStroke([{x:x-20,y:y-92},{x:x+20,y:y-92},{x:x+20,y:y-14},{x:x-20,y:y-14},{x:x-20,y:y-92}], w, 0.18);
+    brushStroke([{x:x-18,y:y-132},{x:x+18,y:y-132},{x:x+18,y:y-92},{x:x-18,y:y-92},{x:x-18,y:y-132}], w-1, 0.16);
+
+    // horns / helmet / mask by type
+    if(e.type.kind==="dokkaebi"){
+      brushStroke([{x:x-10,y:y-132},{x:x-32,y:y-150}], 7, 0.16);
+      brushStroke([{x:x+10,y:y-132},{x:x+32,y:y-150}], 7, 0.16);
+    } else if(e.type.kind==="gate"){
+      // helmet crest
+      brushStroke([{x:x-36,y:y-142},{x:x+36,y:y-142}], 10, 0.14);
+      brushStroke([{x:x,y:y-162},{x:x,y:y-132}], 8, 0.14);
+    } else if(e.type.kind==="wraith"){
+      // samurai shoulder plates
+      brushStroke([{x:x-40,y:y-78},{x:x-18,y:y-64}], 9, 0.14);
+      brushStroke([{x:x+40,y:y-78},{x:x+18,y:y-64}], 9, 0.14);
+    } else if(e.type.kind==="ghost"){
+      // trailing tail
+      brushStroke([{x:x,y:y-14},{x:x-30,y:y+60},{x:x+30,y:y+110}], 10, 0.10);
+    }
+
+    // eyes
+    ctx.fillStyle = INK(0.45);
+    washCircle(x-7, y-112, 2.8, 0.45);
+    washCircle(x+7, y-112, 2.8, 0.45);
+
+    // hurt flash
+    if(e.hurt>0){
+      ctx.fillStyle = INK(0.06*e.hurt);
+      ctx.fillRect(x-60, y-170, 120, 220);
+    }
+
+    // windup cue (attack) — ink ring
+    if(e.windup>0){
+      const a = clamp(e.windup/0.26, 0, 1);
+      ctx.fillStyle = INK(0.02 + 0.04*a);
+      ctx.beginPath(); ctx.ellipse(x, y+10, 70, 24, 0, 0, Math.PI*2); ctx.fill();
+      brushStroke([{x:x-70,y:y+10},{x:x+70,y:y+10}], 6, 0.10*a);
+    }
+  }
+
+  function drawFX(){
+    for(const f of state.fx){
+      if(f.kind==="ring"){
+        const t = f.t/f.life;
+        const r = lerp(f.r, f.R, t);
+        const a = clamp(1-t, 0, 1);
+        const pts=[];
+        const steps=24;
+        for(let i=0;i<=steps;i++){
+          const ang = (i/steps)*Math.PI*2;
+          pts.push({x:f.x + Math.cos(ang)*r, y:f.y + Math.sin(ang)*r*0.62});
+        }
+        brushStroke(pts, 14, 0.12*a);
+      } else if(f.kind==="kanji"){
+        const t = f.t/f.life;
+        const a = clamp(1-t, 0, 1);
+        ctx.save();
+        ctx.fillStyle = INK(0.18*a);
+        ctx.font = `900 ${Math.floor(44 + 14*(1-t))}px system-ui`;
+        ctx.fillText(f.text, f.x-14, f.y);
+        ctx.restore();
+      }
+    }
+  }
+
+  function roundRect(x,y,w,h,r){
+    // canvas roundRect polyfill
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr,y);
+    ctx.arcTo(x+w,y,x+w,y+h,rr);
+    ctx.arcTo(x+w,y+h,x,y+h,rr);
+    ctx.arcTo(x,y+h,x,y,rr);
+    ctx.arcTo(x,y,x+w,y,rr);
+    ctx.closePath();
+  }
+
+  // ---------- Update loop ----------
+  function update(dt){
+    state.dt = dt;
+    state.t += dt;
+
+    if(!state.running) return;
+
+    // wave scaling + spawn
+    state.score += dt * (90 + state.wave*6);
+    const targetWave = 1 + Math.floor(state.score/700);
+    state.wave = Math.max(state.wave, targetWave);
+
+    state.spawnEvery = clamp(1.2 - (state.wave-1)*0.06, 0.45, 1.2);
+    state.spawnT += dt;
+    if(state.spawnT >= state.spawnEvery){
+      state.spawnT = 0;
+      spawnEnemy();
+      if(state.wave >= 6 && Math.random() < 0.35) spawnEnemy();
+    }
+
+    // cooldowns
+    player.dashCD = Math.max(0, player.dashCD - dt);
+    player.slashCD = Math.max(0, player.slashCD - dt);
+    player.invuln = Math.max(0, player.invuln - dt);
+    player.stun = Math.max(0, player.stun - dt);
+    player.parryWindow = Math.max(0, player.parryWindow - dt);
+    player.parryCool = Math.max(0, player.parryCool - dt);
+
+    // guard state + parry detection
+    if(input.guard && player.stun<=0){
+      if(!player.guarding){
+        // guard press moment -> open parry timing
+        startParryWindow();
+      }
+      player.guarding = true;
+    } else {
+      player.guarding = false;
+    }
+
+    // movement direction (keyboard + joystick)
+    let mx = 0, my = 0;
+    if(input.left) mx -= 1;
+    if(input.right) mx += 1;
+    if(input.up) my -= 1;
+    if(input.down) my += 1;
+
+    // stick adds
+    mx += input.stickVec.x;
+    my += input.stickVec.y;
+
+    // normalize
+    const mm = Math.hypot(mx,my);
+    if(mm > 1e-6){
+      mx/=mm; my/=mm;
+      player.face.x = lerp(player.face.x, mx, 1 - Math.pow(0.001, dt));
+      player.face.y = lerp(player.face.y, my, 1 - Math.pow(0.001, dt));
+    }
+
+    // actions
+    if(input.dashPressed){
+      input.dashPressed=false;
+      if(mm > 1e-6) doDash({x:mx,y:my});
+      else doDash({x:player.face.x||0, y:player.face.y||-1});
+    }
+
+    if(input.slashPressed){
+      input.slashPressed=false;
+      doSlash();
+    }
+
+    if(input.specialPressed){
+      input.specialPressed=false;
+      doSpecial();
+    }
+
+    // dash update
+    if(player.dashing){
+      player.dashT += dt;
+      const t = player.dashT / player.dashDur;
+      if(t >= 1){
+        player.dashing=false;
+        // stop dash momentum
+        player.vx *= 0.25; player.vy *= 0.25;
+      } else {
+        player.invuln = Math.max(player.invuln, 0.12);
+      }
+    }
+
+    // movement physics
+    if(player.stun > 0){
+      // when stunned, damp
+      player.vx *= Math.pow(0.001, dt);
+      player.vy *= Math.pow(0.001, dt);
+    } else if(!player.dashing){
+      // free move
+      const spd = player.speed * (player.guarding ? 0.62 : 1.0);
+      const tx = mx * spd;
+      const ty = my * spd;
+      // springy acceleration for smoothness
+      player.vx = lerp(player.vx, tx, 1 - Math.pow(0.001, dt));
+      player.vy = lerp(player.vy, ty, 1 - Math.pow(0.001, dt));
+    }
+
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+    player.x = clamp(player.x, 60, WORLD.w-60);
+    player.y = clamp(player.y, 80, WORLD.h-80);
+
+    // slash update + hit enemies
+    if(player.slashing){
+      player.slashT += dt;
+      const t = player.slashT/player.slashDur;
+      const dmgOn = (t > 0.18 && t < 0.70);
+
+      if(dmgOn){
+        for(const e of state.enemies){
+          if(e.hp <= 0) continue;
+          if(slashHits(e)){
+            e.hp -= 22;
+            e.hurt = 1;
+            e.stun = Math.max(e.stun, 0.20);
+            splatter(e.x, e.y, 0.9);
+            cam.shake = Math.max(cam.shake, 10);
+            player.sp = clamp(player.sp + 10, 0, player.spMax);
+          }
+        }
+      }
+
+      if(player.slashT >= player.slashDur){
+        player.slashing=false;
+        player.slashT=0;
+      }
+    }
+
+    // enemies AI + attacks
+    for(const e of state.enemies){
+      if(e.hp <= 0) continue;
+
+      e.hurt = Math.max(0, e.hurt - dt*4);
+      e.stun = Math.max(0, e.stun - dt*1.8);
+      e.atkCD -= dt;
+
+      const dx = player.x - e.x;
+      const dy = player.y - e.y;
+      const d = Math.hypot(dx,dy) || 1;
+
+      // ghost phase: sometimes blink closer
+      if(e.type.kind==="ghost" && Math.random() < dt*0.25){
+        const step = rand(40, 90);
+        e.x += (dx/d)*step;
+        e.y += (dy/d)*step;
+        splatter(e.x, e.y, 0.35);
+      }
+
+      if(e.stun > 0){
+        e.vx *= Math.pow(0.001, dt);
+        e.vy *= Math.pow(0.001, dt);
+      } else {
+        // approach
+        const spd = e.type.spd * (e.type.kind==="gate" ? 0.92 : 1);
+        e.vx = lerp(e.vx, (dx/d)*spd, 1 - Math.pow(0.001, dt));
+        e.vy = lerp(e.vy, (dy/d)*spd, 1 - Math.pow(0.001, dt));
+      }
+
+      // attack windup + strike (Sekiro-ish)
+      const inRange = d < e.type.atkRange;
+
+      if(inRange && e.atkCD <= 0 && !e.attacking){
+        e.attacking = true;
+        e.windup = 0.26; // telegraph time
+      }
+
+      if(e.attacking){
+        e.windup -= dt;
+        if(e.windup <= 0){
+          // strike moment
+          e.attacking = false;
+          e.atkCD = e.type.atkCD + rand(-0.12, 0.12);
+
+          const distNow = Math.hypot(player.x - e.x, player.y - e.y);
+          if(distNow < e.type.atkRange + 18){
+            const res = takeDamage(e.type.dmg);
+            if(res === "parry"){
+              // enemy stunned hard
+              e.stun = Math.max(e.stun, 0.75);
+              e.hurt = 1;
+              e.hp -= 10; // parry chip
+              splatter(e.x, e.y, 1.1);
+              state.fx.push({ kind:"kanji", x:e.x, y:e.y-70, t:0, life:0.35, text:"弾" });
+            } else if(res === "guard"){
+              // guard pushes back slightly
+              e.x -= (dx/d)*26;
+              e.y -= (dy/d)*26;
+            }
+          }
+        }
+      }
+
+      e.x += e.vx * dt;
+      e.y += e.vy * dt;
+      e.x = clamp(e.x, 60, WORLD.w-60);
+      e.y = clamp(e.y, 80, WORLD.h-80);
+    }
+
+    // cleanup dead
+    for(let i=state.enemies.length-1;i>=0;i--){
+      const e = state.enemies[i];
+      if(e.hp > 0) continue;
+
+      state.enemies.splice(i,1);
+      state.kills += 1;
+      state.score += 180 + state.wave*20;
+      splatter(e.x, e.y, 1.5);
+      cam.shake = Math.max(cam.shake, 12);
+      // SP reward
+      player.sp = clamp(player.sp + 18, 0, player.spMax);
+    }
+
+    // FX update
+    for(const f of state.fx){
+      f.t += dt;
+    }
+    state.fx = state.fx.filter(f => f.t < f.life);
+
+    // flash decay
+    state.flash = Math.max(0, state.flash - dt*1.8);
+
+    // save hi live
+    const s = Math.floor(state.score);
+    if(s > state.hi){ state.hi = s; saveHi(state.hi); }
+
+    updateHUD();
+  }
+
+  // ---------- Main loop ----------
+  function loop(ts){
+    if(!state.last) state.last = ts;
+    const dt = clamp((ts - state.last)/1000, 0, 0.033);
+    state.last = ts;
+
+    update(dt);
+
+    // Clear screen (paper base)
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // draw world
+    draw();
+
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Start ----------
+  reset();
+  hiText.textContent = state.hi;
+  requestAnimationFrame(loop);
+
+  // Overlay click starts
+  overlay.addEventListener("pointerdown", ()=>{
+    if(!state.started) start();
+    else if(state.over) reset();
+  });
+})();
