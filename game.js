@@ -38,6 +38,49 @@
     });
   }
 
+    // ---------- SOUND (mobile safe) ----------
+  const Sound = {
+    ctx: null,
+    unlocked: false,
+    buffers: {},
+    master: 0.9,
+
+    init(){
+      if(this.unlocked) return;
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.unlocked = true;
+    },
+
+    async load(name, urls){
+      const list = [];
+      for(const url of urls){
+        const res = await fetch(url);
+        const arr = await res.arrayBuffer();
+        const buf = await this.ctx.decodeAudioData(arr);
+        list.push(buf);
+      }
+      this.buffers[name] = list;
+    },
+
+    play(name, vol=1, pitchRand=0){
+      if(!this.unlocked) return;
+      const list = this.buffers[name];
+      if(!list || !list.length) return;
+
+      const buf = list[(Math.random()*list.length)|0];
+      const src = this.ctx.createBufferSource();
+      const gain = this.ctx.createGain();
+
+      src.buffer = buf;
+      src.playbackRate.value = 1 + (Math.random()*2-1)*pitchRand;
+      gain.gain.value = vol * this.master;
+
+      src.connect(gain).connect(this.ctx.destination);
+      src.start();
+    }
+  };
+
+
   // ---------- Storage ----------
   const HI_KEY = "ink_blade_hi_v2";
   const loadHi = () => Number(localStorage.getItem(HI_KEY) || "0");
