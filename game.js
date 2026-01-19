@@ -218,15 +218,15 @@ resizeCanvas();
     if(!Sound.buffers.slash){
       Sound.init();
       Sound.load("slash", [
-        "sound/sword.1.ogg","sound/sword.2.ogg","sound/sword.3.ogg",
-        "sound/sword.4.ogg","sound/sword.5.ogg"
+        "Sound/sword.1.ogg","Sound/sword.2.ogg","Sound/sword.3.ogg",
+        "Sound/sword.4.ogg","Sound/sword.5.ogg"
       ]);
-      Sound.load("hit", ["sound/sword.6.ogg","sound/sword.7.ogg"]);
-      Sound.load("parry", ["sound/sword.8.ogg","sound/sword.9.ogg"]);
-      Sound.load("dash", ["sound/sword.10.ogg"]);
-      Sound.load("guard", ["sound/sword.1.ogg"]);
-      Sound.load("special", ["sound/sword.10.ogg"]);
-      Sound.load("ui", ["sound/sword.2.ogg"]);
+      Sound.load("hit", ["Sound/sword.6.ogg","Sound/sword.7.ogg"]);
+      Sound.load("parry", ["Sound/sword.8.ogg","Sound/sword.9.ogg"]);
+      Sound.load("dash", ["Sound/sword.10.ogg"]);
+      Sound.load("guard", ["Sound/sword.1.ogg"]);
+      Sound.load("special", ["Sound/sword.10.ogg"]);
+      Sound.load("ui", ["Sound/sword.2.ogg"]);
     }
 
     state.started=false; state.running=false; state.over=false;
