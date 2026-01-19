@@ -2,6 +2,23 @@
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d", { alpha:false });
 
+  // ---------- CANVAS RESIZE FIX ----------
+function resizeCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+
+  // 실제 픽셀 해상도 설정
+  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+
+  // 논리 좌표계 복구
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+
   // HUD elements
   const hpFill = document.getElementById("hpFill");
   const spFill = document.getElementById("spFill");
@@ -522,6 +539,11 @@
 
   // 🔴 이 줄이 빠져 있어서 화면이 텅 비어 있었음
   draw();
+    // DEBUG: top-left red dot
+ctx.save();
+ctx.fillStyle = "red";
+ctx.fillRect(10, 10, 10, 10);
+ctx.restore();
 
   requestAnimationFrame(loop);
 }
