@@ -7,10 +7,19 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background: #f1e6c8;
+  background: #efe6cf;
   color: #1f2937;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans KR", sans-serif;
   overflow: hidden;
+}
+
+:root{
+  --paper: #efe6cf;
+  --ink: #121214;
+  --glass: rgba(255,255,255,0.58);
+  --line: rgba(0,0,0,0.10);
+  --shadow: 0 10px 30px rgba(0,0,0,0.12);
+  --r: 18px;
 }
 
 /* =========================
@@ -21,7 +30,7 @@ html, body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: #f1e6c8;
+  background: var(--paper);
 }
 
 /* =========================
@@ -30,63 +39,45 @@ html, body {
 .topbar {
   flex: 0 0 auto;
   padding: 10px 14px;
-  background: rgba(255,255,255,0.6);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
+  background: var(--glass);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
   z-index: 10;
 }
 
 .brand__title {
   font-size: 20px;
   font-weight: 900;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.14em;
 }
 
 .brand__sub {
+  margin-top: 2px;
   font-size: 12px;
-  opacity: 0.6;
+  opacity: 0.62;
 }
 
 /* =========================
    HUD
 ========================= */
-.hud {
-  margin-top: 6px;
-}
+.hud { margin-top: 8px; }
+.hud__row { display: flex; gap: 10px; align-items: center; }
+.hud__row--small { margin-top: 6px; gap: 8px; flex-wrap: wrap; }
 
-.hud__row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.hud__row--small {
-  margin-top: 6px;
-  gap: 8px;
-}
-
-.meter {
-  flex: 1;
-}
-
-.meter__label {
-  font-size: 11px;
-  margin-bottom: 2px;
-  opacity: 0.7;
-}
+.meter { flex: 1; min-width: 120px; }
+.meter__label { font-size: 11px; margin-bottom: 2px; opacity: 0.72; }
 
 .meter__bar {
   width: 100%;
   height: 10px;
-  border-radius: 6px;
+  border-radius: 999px;
   background: rgba(0,0,0,0.12);
   overflow: hidden;
 }
-
 .meter__fill {
   height: 100%;
   width: 100%;
-  background: linear-gradient(90deg,#1f2937,#0f172a);
+  background: linear-gradient(90deg, rgba(18,18,20,0.85), rgba(18,18,20,1));
   transition: width 0.12s ease-out;
 }
 
@@ -94,6 +85,7 @@ html, body {
   padding: 4px 10px;
   border-radius: 999px;
   background: rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.10);
   font-size: 12px;
 }
 
@@ -105,7 +97,7 @@ html, body {
   flex: 1 1 auto;
   width: 100%;
   overflow: hidden;
-  background: #f1e6c8;
+  background: var(--paper);
 }
 
 #c {
@@ -125,28 +117,31 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(241,230,200,0.85);
+  background: rgba(239,230,207,0.82);
   z-index: 20;
 }
 
 .panel {
-  max-width: 86%;
+  max-width: 90%;
   padding: 22px 20px;
-  background: rgba(255,255,255,0.85);
-  border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.84);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
   text-align: center;
+  border: 1px solid rgba(0,0,0,0.10);
 }
 
 .panel h2 {
   margin: 0 0 10px 0;
-  font-size: 24px;
+  font-size: 26px;
+  letter-spacing: 0.10em;
 }
 
 .panel p {
+  margin: 0;
   font-size: 13px;
-  line-height: 1.6;
-  opacity: 0.8;
+  line-height: 1.7;
+  opacity: 0.82;
 }
 
 .panel__btns {
@@ -156,18 +151,24 @@ html, body {
   margin-top: 14px;
 }
 
+.panel__tip{
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.70;
+}
+
 .btn {
   padding: 10px 18px;
   border-radius: 999px;
-  border: none;
-  background: rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.10);
   font-size: 14px;
   cursor: pointer;
 }
-
 .btn--ink {
-  background: #1f2937;
+  background: #121214;
   color: #fff;
+  border-color: rgba(0,0,0,0.25);
 }
 
 /* =========================
@@ -182,10 +183,10 @@ html, body {
 
 .stick {
   position: absolute;
-  left: 20px;
-  bottom: 24px;
-  width: 120px;
-  height: 120px;
+  left: 18px;
+  bottom: 22px;
+  width: 122px;
+  height: 122px;
   pointer-events: auto;
 }
 
@@ -193,8 +194,9 @@ html, body {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.07);
   border: 2px solid rgba(0,0,0,0.12);
+  box-shadow: inset 0 8px 14px rgba(0,0,0,0.08);
 }
 
 .stick__knob {
@@ -206,7 +208,8 @@ html, body {
   margin-left: -28px;
   margin-top: -28px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.18);
+  background: rgba(0,0,0,0.16);
+  border: 1px solid rgba(255,255,255,0.20);
   transition: transform 0.08s ease-out;
 }
 
@@ -215,12 +218,12 @@ html, body {
 ========================= */
 .pad {
   position: absolute;
-  right: 20px;
-  bottom: 24px;
+  right: 18px;
+  bottom: 22px;
   display: grid;
-  grid-template-columns: repeat(2, 68px);
-  grid-template-rows: repeat(2, 68px);
-  gap: 14px;
+  grid-template-columns: repeat(2, 72px);
+  grid-template-rows: repeat(2, 72px);
+  gap: 12px;
   pointer-events: auto;
 }
 
@@ -228,108 +231,82 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.12);
-  border: 2px solid rgba(0,0,0,0.18);
-  font-size: 13px;
-  font-weight: 700;
-  color: #1f2937;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.10);
+  border: 2px solid rgba(0,0,0,0.16);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #121214;
   user-select: none;
   cursor: pointer;
-  transition:
-    transform 0.06s ease-out,
-    box-shadow 0.06s ease-out,
-    background 0.06s ease-out;
+  transition: transform 0.06s ease-out, box-shadow 0.06s ease-out, background 0.06s ease-out;
 }
 
-.abtn--big {
-  grid-column: span 2;
-  border-radius: 999px;
-}
+.abtn--big { grid-column: span 2; }
 
-/* 눌림 피드백 */
 .abtn:active {
-  transform: translateY(2px) scale(0.96);
-  background: rgba(0,0,0,0.18);
-  box-shadow: inset 0 3px 8px rgba(0,0,0,0.25);
+  transform: translateY(2px) scale(0.97);
+  background: rgba(0,0,0,0.16);
+  box-shadow: inset 0 3px 10px rgba(0,0,0,0.22);
 }
 
 /* =========================
-   PARRY SUCCESS GLOW
+   FX CLASSES
 ========================= */
 .app.parry-glow {
   animation: parryGlow 0.28s ease-out;
 }
-
 @keyframes parryGlow {
-  0% {
-    box-shadow: inset 0 0 0 rgba(255,255,255,0);
-  }
-  20% {
-    box-shadow: inset 0 0 0 rgba(255,255,255,0.2),
-                0 0 40px rgba(255,255,255,0.35);
-  }
-  100% {
-    box-shadow: inset 0 0 0 rgba(255,255,255,0);
-  }
+  0% { box-shadow: inset 0 0 0 rgba(255,255,255,0); }
+  20% { box-shadow: inset 0 0 0 rgba(255,255,255,0.18), 0 0 46px rgba(180,140,55,0.35); }
+  100% { box-shadow: inset 0 0 0 rgba(255,255,255,0); }
 }
 
-/* =========================
-   DANGER FLASH (ENEMY WINDUP)
-========================= */
 .stage.danger-flash::after {
   content: "";
   position: absolute;
   inset: 0;
   background: radial-gradient(circle at center,
-    rgba(255,80,80,0.25) 0%,
-    rgba(255,80,80,0.12) 30%,
-    rgba(255,80,80,0.0) 70%);
+    rgba(150,20,30,0.22) 0%,
+    rgba(150,20,30,0.10) 30%,
+    rgba(150,20,30,0.0) 70%);
   animation: dangerPulse 0.5s ease-out;
   pointer-events: none;
 }
-
 @keyframes dangerPulse {
   0% { opacity: 0; }
-  20% { opacity: 1; }
+  18% { opacity: 1; }
   100% { opacity: 0; }
 }
 
-/* =========================
-   HP LOW WARNING
-========================= */
 .hud.hp-low {
-  animation: hpPulse 0.6s infinite alternate;
+  animation: hpPulse 0.62s infinite alternate;
 }
-
 @keyframes hpPulse {
   0% { opacity: 1; }
-  100% { opacity: 0.6; }
+  100% { opacity: 0.62; }
+}
+
+/* =========================
+   FOOT
+========================= */
+.foot{
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  opacity: 0.75;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.35);
 }
 
 /* =========================
    SMALL SCREENS
 ========================= */
 @media (max-width: 480px) {
-  .topbar {
-    padding: 8px 10px;
-  }
-  .brand__title {
-    font-size: 18px;
-  }
-  .stick {
-    width: 100px;
-    height: 100px;
-  }
-  .stick__knob {
-    width: 48px;
-    height: 48px;
-    margin-left: -24px;
-    margin-top: -24px;
-  }
-  .pad {
-    grid-template-columns: repeat(2, 60px);
-    grid-template-rows: repeat(2, 60px);
-    gap: 10px;
-  }
+  .topbar { padding: 8px 10px; }
+  .brand__title { font-size: 18px; }
+  .stick { width: 104px; height: 104px; left: 14px; bottom: 16px; }
+  .stick__knob { width: 48px; height: 48px; margin-left: -24px; margin-top: -24px; }
+  .pad { right: 14px; bottom: 16px; grid-template-columns: repeat(2, 62px); grid-template-rows: repeat(2, 62px); gap: 10px; }
 }
