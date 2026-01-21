@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <title>Ink Sword — Western Ink Duel</title>
+  <title>Ink Sword — Seoul Brush Arena</title>
 
   <meta name="theme-color" content="#efe6cf" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -16,7 +16,7 @@
     <header class="topbar">
       <div class="brand">
         <div class="brand__title">INK SWORD</div>
-        <div class="brand__sub">Western Brush • Arena Slash</div>
+        <div class="brand__sub">Seoul Brush • Ink Duel</div>
       </div>
 
       <div class="hud">
@@ -35,12 +35,23 @@
           <div class="pill">BEST <b id="hiText">0</b></div>
           <div class="pill">KILLS <b id="killText">0</b></div>
           <div class="pill">WAVE <b id="waveText">1</b></div>
+          <div class="pill">COMBO <b id="comboText">0</b></div>
+          <div class="pill">RANK <b id="rankText">-</b></div>
         </div>
       </div>
     </header>
 
     <main class="stage" id="stage">
       <canvas id="c"></canvas>
+
+      <!-- Combo / Rank Pop -->
+      <div class="rank-pop" id="rankPop" aria-hidden="true">
+        <div class="rank-pop__rank" id="rankPopRank">A</div>
+        <div class="rank-pop__meta">
+          <span class="rank-pop__combo" id="rankPopCombo">x3</span>
+          <span class="rank-pop__sub" id="rankPopSub">묵기 연계!</span>
+        </div>
+      </div>
 
       <div class="overlay" id="overlay">
         <div class="panel">
@@ -54,7 +65,7 @@
             <button class="btn" id="resetBtn">RESET</button>
           </div>
           <div class="panel__tip">
-            TIP: 가드(K) “딱 맞게” 누르면 패링 → 주변 잉크가 터지며 기력이 확 찹니다.
+            TIP: 가드(K) “딱 맞게” 누르면 패링 → 콤보가 더 잘 이어집니다.
           </div>
         </div>
       </div>
@@ -76,7 +87,7 @@
     </main>
 
     <footer class="foot">
-      <span>서양 잉크 브러시의 번짐/스플래터를 “실시간”으로 그립니다.</span>
+      <span>서예 스트로크 + 서울 스카이라인 + 콤보 랭크 연출</span>
     </footer>
   </div>
 
