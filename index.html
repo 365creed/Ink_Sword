@@ -2,25 +2,21 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-
-  <!-- 모바일 안전 뷰포트 -->
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>Ink Sword — Western Ink Duel</title>
 
-  <title>묵검(墨劍): 세로 수묵 액션</title>
-
-  <!-- PWA / 모바일 UI 안정 -->
-  <meta name="theme-color" content="#f1e6c8" />
+  <meta name="theme-color" content="#efe6cf" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="app">
     <header class="topbar">
       <div class="brand">
-        <div class="brand__title">묵검(墨劍)</div>
-        <div class="brand__sub">Ink Blade • Portrait Action</div>
+        <div class="brand__title">INK SWORD</div>
+        <div class="brand__sub">Western Brush • Arena Slash</div>
       </div>
 
       <div class="hud">
@@ -30,32 +26,35 @@
             <div class="meter__bar"><div class="meter__fill" id="hpFill"></div></div>
           </div>
           <div class="meter">
-            <div class="meter__label">기(氣)</div>
+            <div class="meter__label">INK</div>
             <div class="meter__bar"><div class="meter__fill" id="spFill"></div></div>
           </div>
         </div>
         <div class="hud__row hud__row--small">
-          <div class="pill">점수 <b id="scoreText">0</b></div>
-          <div class="pill">최고 <b id="hiText">0</b></div>
-          <div class="pill">처치 <b id="killText">0</b></div>
+          <div class="pill">SCORE <b id="scoreText">0</b></div>
+          <div class="pill">BEST <b id="hiText">0</b></div>
+          <div class="pill">KILLS <b id="killText">0</b></div>
+          <div class="pill">WAVE <b id="waveText">1</b></div>
         </div>
       </div>
     </header>
 
-    <main class="stage">
-      <canvas id="c" width="720" height="1280"></canvas>
+    <main class="stage" id="stage">
+      <canvas id="c"></canvas>
 
       <div class="overlay" id="overlay">
         <div class="panel">
-          <h2 id="ovTitle">시작</h2>
+          <h2 id="ovTitle">INK SWORD</h2>
           <p id="ovBody">
-            세로 수묵 액션. 넓은 맵을 자유롭게 누비며 도깨비/귀신/수문장/무사 망령을 상대하세요.<br/>
-            <b>이동</b> WASD / 방향키 · <b>베기</b> J · <b>가드</b> K(누르고) · <b>패링</b> K 타이밍 · <b>대시</b> L · <b>필살기</b> I<br/>
-            모바일: 왼쪽 조이스틱 이동 · 오른쪽 버튼(베기/가드/대시/필살기)
+            <b>이동</b> WASD/방향키 · <b>베기</b> J · <b>가드</b> K(누름) · <b>대시</b> L · <b>잉크 폭발</b> I<br/>
+            모바일: 왼쪽 조이스틱 이동 · 오른쪽 버튼(베기/가드/대시/폭발)
           </p>
           <div class="panel__btns">
-            <button class="btn btn--ink" id="startBtn">시작</button>
-            <button class="btn" id="resetBtn">리셋</button>
+            <button class="btn btn--ink" id="startBtn">START</button>
+            <button class="btn" id="resetBtn">RESET</button>
+          </div>
+          <div class="panel__tip">
+            TIP: 가드(K) “딱 맞게” 누르면 패링 → 주변 잉크가 터지며 기력이 확 찹니다.
           </div>
         </div>
       </div>
@@ -68,23 +67,18 @@
         </div>
 
         <div class="pad">
-          <button class="abtn" id="btnSlash" aria-label="베기">베기</button>
-          <button class="abtn" id="btnGuard" aria-label="가드">가드</button>
-          <button class="abtn" id="btnDash" aria-label="대시">대시</button>
-          <button class="abtn abtn--big" id="btnSpecial" aria-label="필살기">필살기</button>
+          <button class="abtn" id="btnSlash" aria-label="Slash">SLASH</button>
+          <button class="abtn" id="btnGuard" aria-label="Guard">GUARD</button>
+          <button class="abtn" id="btnDash" aria-label="Dash">DASH</button>
+          <button class="abtn abtn--big" id="btnSpecial" aria-label="Ink Burst">INK BURST</button>
         </div>
       </div>
     </main>
 
     <footer class="foot">
-      <span>TIP: 패링은 <b>K를 공격 직전에 눌러</b> 성공시키면 적이 경직되고 기(氣)가 크게 찹니다.</span>
+      <span>서양 잉크 브러시의 번짐/스플래터를 “실시간”으로 그립니다.</span>
     </footer>
   </div>
-
-  <!-- iOS 사운드 언락용 더미 오디오 -->
-  <audio id="unlockAudio" preload="auto" style="display:none">
-    <source src="sound/sword.1.ogg" type="audio/ogg">
-  </audio>
 
   <script src="./game.js"></script>
 </body>
