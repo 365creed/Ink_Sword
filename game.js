@@ -1314,3 +1314,120 @@
   }, { passive: true });
 
 })();
+
+/* =========================
+   MOBILE INPUT PATCH (Joystick + Attack)
+========================= */
+const INPUT = {
+  ax: 0,  // -1 ~ 1
+  ay: 0,  // -1 ~ 1
+  atk: false,
+};
+
+(function setupMobileControls(){
+  const ui = document.getElementById("mobileUI");
+  const joy = document.getElementById("joy");
+  const base = document.getElementById("joyBase");
+  const stick = document.getElementById("joyStick");
+  const btnAtk = document.getElementById("btnAtk");
+  if(!ui || !joy || !base || !stick || !btnAtk) return;
+
+  // 모바일에서만 보이게(원하면 제거 가능)
+  const isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+  if(!isTouch) ui.style.display = "none";
+
+  let dragging = false;
+  let centerX = 0, centerY = 0;
+  const R = 46;      // 조이스틱 반경(감도)
+  const DEAD = 6;    // 데드존(px)
+
+  function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+  function setCenter(){
+    const r = base.getBoundingClientRect();
+    centerX = r.left + r.width/2;
+    centerY = r.top + r.height/2;
+  }
+
+  function updateStick(clientX, clientY){
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const dist = Math.hypot(dx, dy);
+
+    if(dist < DEAD){
+      stick.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
+      INPUT.ax = 0; INPUT.ay = 0;
+      return;
+    }
+
+    const nx = dx / (dist || 1);
+    const ny = dy / (dist || 1);
+
+    // 스틱 UI 이동(최대 R)
+    const px = clamp(dx, -R, R);
+    const py = clamp(dy, -R, R);
+    stick.style.transform = `translate(-50%, -50%) translate(${px}px, ${py}px)`;
+
+    // 입력값(-1~1)
+    const strength = clamp(dist / R, 0, 1);
+    INPUT.ax = nx * strength;
+    INPUT.ay = ny * strength;
+  }
+
+  function stop(){
+    dragging = false;
+    stick.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
+    INPUT.ax = 0; INPUT.ay = 0;
+  }
+
+  // ✅ pointer 이벤트로 모바일/PC 모두 안정적(터치+마우스 통합)
+  joy.addEventListener("pointerdown", (e)=>{
+    dragging = true;
+    joy.setPointerCapture(e.pointerId);
+    setCenter();
+    updateStick(e.clientX, e.clientY);
+    e.preventDefault();
+  });
+
+  joy.addEventListener("pointermove", (e)=>{
+    if(!dragging) return;
+    updateStick(e.clientX, e.clientY);
+    e.preventDefault();
+  });
+
+  joy.addEventListener("pointerup", (e)=>{
+    stop();
+    e.preventDefault();
+  });
+  joy.addEventListener("pointercancel", stop);
+
+  // 공격 버튼 (눌렀을 때 1회 공격)
+  btnAtk.addEventListener("pointerdown", (e)=>{
+    INPUT.atk = true;
+    e.preventDefault();
+  });
+  btnAtk.addEventListener("pointerup", (e)=>{
+    e.preventDefault();
+  });
+
+  window.addEventListener("resize", setCenter);
+  setTimeout(setCenter, 0);
+})();
+
+/* =========================
+   ✅ 너 게임 코드랑 연결하는 부분 (여기만 바꾸면 끝)
+   - 게임 루프(매 프레임)에서 아래 함수를 한번 호출해줘.
+========================= */
+function APPLY_MOBILE_INPUT(){
+  // 1) 이동: 아래 playerMove(ax, ay) 를 네 프로젝트 함수/변수로 연결
+  // 예) player.vx = INPUT.ax * player.speed; player.vy = INPUT.ay * player.speed;
+  if (typeof playerMove === "function") {
+    playerMove(INPUT.ax, INPUT.ay);
+  }
+
+  // 2) 공격: 아래 playerAttack() 를 네 프로젝트 함수/변수로 연결
+  if (INPUT.atk) {
+    INPUT.atk = false;
+    if (typeof playerAttack === "function") playerAttack();
+  }
+}
