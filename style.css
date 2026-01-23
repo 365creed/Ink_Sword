@@ -375,6 +375,9 @@ html, body {
   border-radius: 22px;
   pointer-events: auto;
 
+canvas, #c, #game, #mobileUI, #mobileUI * { touch-action:none !important; }
+body { overscroll-behavior:none; }
+
   border: 1px solid rgba(255,255,255,0.28);
   background: rgba(255,255,255,0.14);
   backdrop-filter: blur(8px);
