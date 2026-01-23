@@ -1431,3 +1431,17 @@ function APPLY_MOBILE_INPUT(){
     if (typeof playerAttack === "function") playerAttack();
   }
 }
+
+// === INPUT DEBUG HUD (모바일에서 입력 들어오는지 눈으로 확인) ===
+(function(){
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;left:10px;top:10px;z-index:99999;padding:8px 10px;background:rgba(0,0,0,.55);color:#fff;font:12px/1.2 monospace;border-radius:10px;pointer-events:none";
+  document.body.appendChild(d);
+
+  setInterval(()=> {
+    const ax = (window.INPUT?.ax ?? 0).toFixed(2);
+    const ay = (window.INPUT?.ay ?? 0).toFixed(2);
+    const atk = window.INPUT?.atk ? "1":"0";
+    d.textContent = `ax:${ax} ay:${ay} atk:${atk}`;
+  }, 100);
+})();
