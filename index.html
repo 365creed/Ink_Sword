@@ -70,8 +70,8 @@
         </div>
       </div>
 
-      <!-- Mobile Controls -->
-      <div class="touch">
+      <!-- Mobile Controls (조이스틱 1개만 사용) -->
+      <div class="touch" id="touchUI" aria-hidden="false">
         <div class="stick" id="stick">
           <div class="stick__base"></div>
           <div class="stick__knob" id="knob"></div>
@@ -92,15 +92,5 @@
   </div>
 
   <script src="./game.js"></script>
-
-<!-- MOBILE CONTROLS -->
-<div id="mobileUI">
-  <div id="joy">
-    <div id="joyBase"></div>
-    <div id="joyStick"></div>
-  </div>
-
-  <button id="btnAtk" type="button" aria-label="attack">⚔️</button>
-</div>
 </body>
 </html>
