@@ -1,9 +1,8 @@
-/* game.js — FULL REPLACE (HEAVY / WEIGHTY “SANNABI-ish” monochrome line-pixel feel)
-   - 검정색만(알파로 대비)
-   - 베기 범위/궤적이 확실히 보임(부채꼴 + 다중 획 + 잔선 스파크)
-   - 가드가 “방패 영역”처럼 보임(전방 부채 + 링 + 떨림)
-   - 플레이어/적 구분 명확(정돈된 홍길동 실루엣 vs 거친 먹귀)
-   - 타격감 강화(히트스톱/카메라 흔들림/진동/스크래치 파편)
+/* game.js — FULL REPLACE
+   High-res Pixel (JS-only) Sprites (Monochrome)
+   - Player: Hong-gildong vibe (hat + robe + sword) in pixel-map
+   - Enemies: 3 types in pixel-map (wraith / brute / dart)
+   - Heavy feel: longer hitstop, stronger shake, slower swing, visible cone + pixel stroke
 */
 (() => {
   const canvas = document.getElementById("c");
@@ -65,7 +64,7 @@
     try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
   }
 
-  // tiny synth: heavier = lower pitch
+  // tiny synth
   let audioCtx = null;
   function beep(freq = 160, dur = 0.06, type = "square", gain = 0.04) {
     try {
@@ -102,7 +101,6 @@
     combo: 0,
     comboTimer: 0,
     rank: "-",
-    // “무게감”: 카메라가 살짝 뒤따라오도록
     camX: 0,
     camY: 0,
   };
@@ -125,9 +123,13 @@
     slashCD: 0,
     invuln: 0,
 
-    flash: 0,     // 번쩍
-    guardFx: 0,   // 가드 강조
-    swingFx: 0,   // 베기 모션 잔상/일렁임 강도
+    flash: 0,
+    guardFx: 0,
+    swingFx: 0,
+
+    animT: 0,
+    facing: 1, // 1 right, -1 left (for mirroring)
+    act: "idle", // idle / walk / slash / guard / dash
   };
 
   const input = {
@@ -140,14 +142,14 @@
   };
 
   const enemies = [];
-  const particles = [];   // 잉크 점/파편
-  const scratches = [];   // “검은 잔선” 파편
-  const slashes = [];     // 베기 궤적(시각)
+  const dots = [];
+  const slashes = [];
+
   const skyline = [];
   const wires = [];
 
   /* =========================
-     Background: skyline + wires (더 산나비 느낌)
+     Background
   ========================= */
   function seedBackground() {
     skyline.length = 0;
@@ -159,24 +161,17 @@
       const w = rand(50, 140);
       const h = rand(50, 280);
       skyline.push({
-        x,
-        w,
-        h,
+        x, w, h,
         y: baseY + rand(-12, 18),
         dents: Math.floor(rand(2, 6)),
       });
       x += w * rand(0.55, 0.9);
     }
 
-    // 전선 (얇은 곡선 여러 개)
     const wireCount = 4;
     for (let i = 0; i < wireCount; i++) {
       const y0 = baseY + rand(-110, 40) + i * rand(16, 30);
-      wires.push({
-        y0,
-        a: rand(0.8, 1.4),
-        ph: rand(0, Math.PI * 2),
-      });
+      wires.push({ y0, a: rand(0.8, 1.4), ph: rand(0, Math.PI * 2) });
     }
   }
   seedBackground();
@@ -235,14 +230,12 @@
       if (edge === 2) { x = rand(0, WORLD.w); y = -50; }
       if (edge === 3) { x = rand(0, WORLD.w); y = WORLD.h + 50; }
 
-      // 무게감: 적도 살짝 둔중
-      const speed = 52 + Math.random() * (25 + state.wave * 3.8);
-
       const typeRoll = Math.random();
       const type = typeRoll < 0.65 ? "wraith" : (typeRoll < 0.9 ? "brute" : "dart");
 
+      const speed = 52 + Math.random() * (25 + state.wave * 3.8);
       const baseR = type === "brute" ? rand(22, 30) : (type === "dart" ? rand(14, 18) : rand(16, 24));
-      const baseHP = type === "brute" ? 36 : (type === "dart" ? 20 : 26);
+      const baseHP = type === "brute" ? 38 : (type === "dart" ? 22 : 28);
 
       enemies.push({
         kind: "enemy",
@@ -253,6 +246,7 @@
         sp: speed * (type === "dart" ? 1.35 : (type === "brute" ? 0.85 : 1)),
         hit: 0,
         wob: rand(0, 999),
+        animT: rand(0, 10),
       });
     }
   }
@@ -283,10 +277,11 @@
     player.flash = 0;
     player.guardFx = 0;
     player.swingFx = 0;
+    player.animT = 0;
+    player.act = "idle";
 
     enemies.length = 0;
-    particles.length = 0;
-    scratches.length = 0;
+    dots.length = 0;
     slashes.length = 0;
 
     if (full) seedBackground();
@@ -295,86 +290,39 @@
   }
 
   /* =========================
-     FX particles
+     FX
   ========================= */
-  function inkDot(x, y, vx, vy, life, size) {
-    particles.push({ x, y, vx, vy, life, t: life, size });
+  function dot(x, y, vx, vy, life, size) {
+    dots.push({ x, y, vx, vy, life, t: life, size });
   }
-  function scratchLine(x, y, vx, vy, life, w) {
-    scratches.push({ x, y, vx, vy, life, t: life, w, a: rand(0, Math.PI * 2) });
-  }
-  function burstInk(x, y, power = 1) {
-    const n = Math.floor(16 * power);
+  function burstDots(x, y, power = 1) {
+    const n = Math.floor(18 * power);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
-      const s = (60 + Math.random() * 260) * power;
-      inkDot(x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.22, 0.55), rand(2, 5));
-    }
-    const m = Math.floor(10 * power);
-    for (let i = 0; i < m; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const s = (120 + Math.random() * 360) * power;
-      scratchLine(x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.14, 0.32), rand(10, 18));
+      const s = (80 + Math.random() * 260) * power;
+      dot(x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.16, 0.45), rand(1, 4));
     }
   }
-
-  function hitStop(frames = 3) {
+  function hitStop(frames = 4) {
     state.hitStop = Math.max(state.hitStop, frames);
   }
-  function shake(amount = 10) {
+  function shake(amount = 12) {
     state.shake = Math.max(state.shake, amount);
   }
 
   /* =========================
-     Visible range (heavy slash cone)
-  ========================= */
-  function drawCone(ctx2, sx, sy, fx, fy, reach, halfAngle, alpha) {
-    const ang = Math.atan2(fy, fx);
-    ctx2.save();
-    ctx2.translate(sx, sy);
-    ctx2.rotate(ang);
-
-    // fill
-    ctx2.globalAlpha = alpha;
-    ctx2.fillStyle = "#000";
-    ctx2.beginPath();
-    ctx2.moveTo(0, 0);
-    ctx2.arc(0, 0, reach, -halfAngle, halfAngle);
-    ctx2.closePath();
-    ctx2.fill();
-
-    // outline
-    ctx2.globalAlpha = Math.min(1, alpha + 0.18);
-    ctx2.strokeStyle = "#000";
-    ctx2.lineWidth = 2;
-    ctx2.beginPath();
-    ctx2.arc(0, 0, reach, -halfAngle, halfAngle);
-    ctx2.stroke();
-
-    // inner ring hint
-    ctx2.globalAlpha = alpha * 0.55;
-    ctx2.lineWidth = 1;
-    ctx2.beginPath();
-    ctx2.arc(0, 0, reach * 0.72, 0, Math.PI * 2);
-    ctx2.stroke();
-
-    ctx2.restore();
-  }
-
-  /* =========================
-     Slash visuals pack
+     Attack visuals
   ========================= */
   function pushSlash(px, py, dx, dy, heavy = false) {
     const [nx, ny] = norm(dx, dy);
-    const life = heavy ? 0.22 : 0.16; // 더 오래 남게(무게감)
+    const life = heavy ? 0.22 : 0.16;
     const reach = heavy ? 128 : 98;
     const half = heavy ? 0.84 : 0.62;
     slashes.push({
       x: px + nx * 16,
       y: py + ny * 16,
       nx, ny,
-      life,
-      t: life,
+      life, t: life,
       heavy,
       reach,
       half,
@@ -383,46 +331,6 @@
     });
   }
 
-  /* =========================
-     Combat: heavy feel
-  ========================= */
-  function dealDamage(e, dmg, hx, hy, isHeavy = false) {
-    e.hp -= dmg;
-    e.hit = 0.16;
-
-    // 무게감: 강할수록 더 긴 히트스톱/더 큰 흔들림
-    player.flash = Math.max(player.flash, isHeavy ? 0.36 : 0.22);
-    player.swingFx = Math.max(player.swingFx, isHeavy ? 0.42 : 0.26);
-
-    burstInk(hx, hy, isHeavy ? 1.35 : 1.0);
-    shake(isHeavy ? 16 : 11);
-    hitStop(isHeavy ? 5 : 3);
-
-    beep(isHeavy ? 120 : 150, isHeavy ? 0.08 : 0.06, "square", isHeavy ? 0.055 : 0.045);
-    haptic(isHeavy ? 34 : 22);
-
-    if (e.hp <= 0) {
-      state.kills += 1;
-      killText.textContent = String(state.kills);
-
-      state.score += 12 + Math.floor(state.combo * 1.7);
-      addCombo();
-
-      burstInk(e.x, e.y, 1.8);
-      beep(85, 0.09, "sawtooth", 0.05);
-
-      enemies.splice(enemies.indexOf(e), 1);
-
-      if (enemies.length === 0) {
-        state.wave += 1;
-        waveText.textContent = String(state.wave);
-        state.score += 60 + state.wave * 6;
-        spawnWave(state.wave);
-      }
-    }
-  }
-
-  // 공격 판정을 “부채꼴(시각과 동일)”로 맞춤
   function inCone(px, py, fx, fy, ex, ey, reach, halfAngle) {
     const dx = ex - px;
     const dy = ey - py;
@@ -436,10 +344,44 @@
     return Math.abs(da) <= halfAngle;
   }
 
+  function dealDamage(e, dmg, hx, hy, isHeavy = false) {
+    e.hp -= dmg;
+    e.hit = 0.16;
+
+    player.flash = Math.max(player.flash, isHeavy ? 0.36 : 0.22);
+    player.swingFx = Math.max(player.swingFx, isHeavy ? 0.42 : 0.26);
+
+    burstDots(hx, hy, isHeavy ? 1.35 : 1.0);
+    shake(isHeavy ? 16 : 11);
+    hitStop(isHeavy ? 5 : 3);
+
+    beep(isHeavy ? 120 : 150, isHeavy ? 0.08 : 0.06, "square", isHeavy ? 0.055 : 0.045);
+    haptic(isHeavy ? 34 : 22);
+
+    if (e.hp <= 0) {
+      state.kills += 1;
+      killText.textContent = String(state.kills);
+
+      state.score += 12 + Math.floor(state.combo * 1.7);
+      addCombo();
+
+      burstDots(e.x, e.y, 1.8);
+      beep(85, 0.09, "sawtooth", 0.05);
+
+      enemies.splice(enemies.indexOf(e), 1);
+
+      if (enemies.length === 0) {
+        state.wave += 1;
+        waveText.textContent = String(state.wave);
+        state.score += 60 + state.wave * 6;
+        spawnWave(state.wave);
+      }
+    }
+  }
+
   function slashAttack(heavy = false) {
     if (player.slashCD > 0) return;
 
-    // 무게감: 공격 속도 느리게, 대신 강하게
     const cost = heavy ? 32 : 12;
     if (player.ink < cost) return;
 
@@ -454,27 +396,26 @@
     player.flash = Math.max(player.flash, heavy ? 0.30 : 0.16);
     player.swingFx = Math.max(player.swingFx, heavy ? 0.40 : 0.22);
 
-    // 히트 박스: 시각과 동일
     const reach = heavy ? 128 : 98;
     const half = heavy ? 0.84 : 0.62;
     const dmg = heavy ? 30 : 16;
 
-    // “무거운 휘두름” 느낌: 살짝 전진
+    // heavy shove forward
     const [nx, ny] = norm(fx, fy);
     player.vx += nx * (heavy ? 140 : 60);
     player.vy += ny * (heavy ? 140 : 60);
 
-    // 타격 판정
     for (const e of [...enemies]) {
-      const hit = inCone(player.x, player.y, fx, fy, e.x, e.y, reach + e.r, half);
-      if (!hit) continue;
-
+      if (!inCone(player.x, player.y, fx, fy, e.x, e.y, reach + e.r, half)) continue;
       const hx = lerp(player.x, e.x, 0.65);
       const hy = lerp(player.y, e.y, 0.65);
       dealDamage(e, dmg, hx, hy, heavy);
     }
 
-    // 휘두름 자체 임팩트(헛스윙도 무게감)
+    // act/anim
+    player.act = "slash";
+    player.animT = 0;
+
     shake(heavy ? 11 : 7);
     hitStop(heavy ? 2 : 1);
     beep(heavy ? 135 : 210, heavy ? 0.09 : 0.06, "triangle", heavy ? 0.05 : 0.035);
@@ -494,11 +435,14 @@
     player.vx += nx * 520;
     player.vy += ny * 520;
 
-    burstInk(player.x, player.y, 0.85);
+    burstDots(player.x, player.y, 0.85);
     shake(10);
     hitStop(1);
     beep(260, 0.05, "sine", 0.05);
     haptic(16);
+
+    player.act = "dash";
+    player.animT = 0;
   }
 
   function specialInkBurst() {
@@ -509,7 +453,7 @@
     player.swingFx = Math.max(player.swingFx, 0.55);
 
     const radius = 165;
-    burstInk(player.x, player.y, 2.2);
+    burstDots(player.x, player.y, 2.2);
     pushSlash(player.x, player.y, player.faceX || 1, player.faceY || 0, true);
 
     for (const e of [...enemies]) {
@@ -521,6 +465,9 @@
     hitStop(6);
     beep(95, 0.13, "sawtooth", 0.06);
     haptic(38);
+
+    player.act = "slash";
+    player.animT = 0;
   }
 
   /* =========================
@@ -542,7 +489,7 @@
   }, { passive: true });
 
   /* =========================
-     Input: Touch joystick (single)
+     Touch joystick (single)
   ========================= */
   const joy = {
     active: false,
@@ -600,7 +547,7 @@
   window.addEventListener("pointercancel", joyEnd, { passive: true });
 
   /* =========================
-     Input: Mobile buttons
+     Touch buttons
   ========================= */
   function bindHold(btn, onDown, onUp) {
     btn.addEventListener("pointerdown", (e) => {
@@ -619,27 +566,27 @@
     btn.addEventListener("lostpointercapture", () => btn.classList.remove("is-down"), { passive: true });
   }
 
-  // SLASH: 짧게 누르면 라이트 / 길게(0.22s)면 헤비로 자동
+  // SLASH: short=light, hold>=0.22=heavy
   let slashHoldT = 0;
   bindHold(btnSlash,
     () => { slashHoldT = 0.0001; },
     () => {
       const heavy = slashHoldT >= 0.22;
-      input.slash = false;
+      slashHoldT = 0;
       slashAttack(heavy);
     }
   );
-
   bindHold(btnGuard, () => (input.guard = true), () => (input.guard = false));
   bindHold(btnDash, () => { input.dash = true; }, () => {});
   bindHold(btnSpecial, () => { input.special = true; }, () => {});
 
-  // Overlay
+  /* =========================
+     Overlay
+  ========================= */
   startBtn.addEventListener("click", () => {
     overlay.classList.add("hide");
     state.running = true;
     state.last = performance.now();
-    // iOS audio unlock
     beep(1, 0.001, "sine", 0.0001);
   });
   resetBtn.addEventListener("click", () => {
@@ -649,238 +596,427 @@
   });
 
   /* =========================
-     Character Draw (monochrome line/pixel)
+     Pixel Sprite System (JS-only)
   ========================= */
-  function inkFlicker(ctx2, x, y, r, power, t) {
-    const n = 10;
-    ctx2.save();
-    ctx2.translate(x, y);
-    ctx2.globalAlpha = 0.10 * power;
-    ctx2.strokeStyle = "#000";
-    ctx2.lineWidth = 2;
-    ctx2.lineCap = "square";
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + t * 6;
-      const rr = r + 10 + Math.sin(t * 10 + i) * 7 * power;
-      const ex = Math.cos(a) * rr;
-      const ey = Math.sin(a) * rr;
-      ctx2.beginPath();
-      ctx2.moveTo(0, 0);
-      ctx2.quadraticCurveTo(ex * 0.35, ey * 0.35, ex, ey);
-      ctx2.stroke();
-    }
-    ctx2.restore();
+  // Characters used:
+  //  ' ' empty
+  //  '#' solid pixel
+  //  '.' soft pixel (lighter via alpha)
+  //  '+' highlight pixel (still black, but more opaque)
+  function spriteFromStrings(lines) {
+    const h = lines.length;
+    const w = lines[0].length;
+    return { w, h, lines };
   }
 
-  function drawHeroHongGildong(ctx2, x, y, fx, fy, flash, guardFx, swingFx, inv, t) {
-    x = snap(x); y = snap(y);
-    const dir = Math.atan2(fy || 0, fx || 1);
+  function drawSprite(ctx2, spr, x, y, px, alpha = 1, mirrorX = false, rot = 0) {
+    // x,y = center position in screen pixels
+    const w = spr.w, h = spr.h;
+    const ox = Math.floor(w / 2);
+    const oy = Math.floor(h / 2);
 
     ctx2.save();
-    ctx2.translate(x, y);
-    ctx2.rotate(dir);
+    ctx2.translate(snap(x), snap(y));
+    if (rot) ctx2.rotate(rot);
+    ctx2.scale(mirrorX ? -1 : 1, 1);
+    ctx2.translate(-ox * px, -oy * px);
 
-    // flash blob
-    const f = clamp(flash, 0, 1);
-    if (f > 0.001) {
-      ctx2.globalAlpha = 0.18 * f;
-      ctx2.fillStyle = "#000";
-      ctx2.beginPath();
-      ctx2.arc(0, 0, 46, 0, Math.PI * 2);
-      ctx2.fill();
-      ctx2.globalAlpha = 1;
-    }
+    ctx2.imageSmoothingEnabled = false;
 
-    // swing smear (묵직한 휘두름 잔상)
-    const sf = clamp(swingFx, 0, 1);
-    if (sf > 0.01) {
-      ctx2.save();
-      ctx2.globalAlpha = 0.10 * sf;
-      ctx2.fillStyle = "#000";
-      ctx2.beginPath();
-      ctx2.moveTo(8, 6);
-      ctx2.arc(0, 0, 56, -0.55, 0.55);
-      ctx2.closePath();
-      ctx2.fill();
-      ctx2.restore();
-    }
+    for (let yy = 0; yy < h; yy++) {
+      const row = spr.lines[yy];
+      for (let xx = 0; xx < w; xx++) {
+        const c = row[xx];
+        if (c === " ") continue;
 
-    ctx2.strokeStyle = "#000";
-    ctx2.lineCap = "square";
+        let a = alpha;
+        if (c === ".") a *= 0.35;
+        else if (c === "#") a *= 0.85;
+        else if (c === "+") a *= 1.0;
 
-    // cloak: 더 각지고 무겁게
-    ctx2.lineWidth = 4;
-    ctx2.beginPath();
-    ctx2.moveTo(-22, 14);
-    ctx2.quadraticCurveTo(-10, 34, 16, 22);
-    ctx2.quadraticCurveTo(36, 10, 24, -6);
-    ctx2.stroke();
-
-    // torn hem lines (도포 아래 찢김 느낌)
-    ctx2.globalAlpha = 0.55;
-    ctx2.lineWidth = 2;
-    for (let i = 0; i < 6; i++) {
-      const xx = -18 + i * 7;
-      const yy = 22 + (i % 2) * 2;
-      ctx2.beginPath();
-      ctx2.moveTo(xx, yy);
-      ctx2.lineTo(xx + 4, yy + 10 + (i % 3));
-      ctx2.stroke();
-    }
-    ctx2.globalAlpha = 1;
-
-    // torso line
-    ctx2.lineWidth = 5;
-    ctx2.beginPath();
-    ctx2.moveTo(-8, 12);
-    ctx2.quadraticCurveTo(0, 24, 12, 12);
-    ctx2.stroke();
-
-    // hat brim (크게)
-    ctx2.lineWidth = 4;
-    ctx2.beginPath();
-    ctx2.ellipse(0, -14, 22, 8, 0, 0, Math.PI * 2);
-    ctx2.stroke();
-
-    // hat top
-    ctx2.lineWidth = 3;
-    ctx2.beginPath();
-    ctx2.moveTo(-12, -14);
-    ctx2.quadraticCurveTo(0, -32, 12, -14);
-    ctx2.stroke();
-
-    // face dot
-    ctx2.fillStyle = "#000";
-    ctx2.fillRect(6, -10, 2, 2);
-
-    // sword (longer, heavier)
-    ctx2.lineWidth = 4;
-    ctx2.beginPath();
-    ctx2.moveTo(10, 8);
-    ctx2.lineTo(42, 2);
-    ctx2.stroke();
-
-    // sword tip scratches
-    ctx2.globalAlpha = 0.55;
-    ctx2.lineWidth = 1;
-    ctx2.beginPath();
-    ctx2.moveTo(42, 2);
-    ctx2.lineTo(54, -2);
-    ctx2.moveTo(40, 6);
-    ctx2.lineTo(50, 10);
-    ctx2.stroke();
-    ctx2.globalAlpha = 1;
-
-    // Guard: 링 + 전방 부채 + 떨림
-    if (guardFx > 0.01) {
-      const g = guardFx;
-      ctx2.save();
-      ctx2.globalAlpha = 0.28 * g;
-      ctx2.lineWidth = 6;
-      ctx2.beginPath();
-      ctx2.arc(0, 0, 38, 0, Math.PI * 2);
-      ctx2.stroke();
-
-      // front fan shows defense zone
-      ctx2.globalAlpha = 0.14 * g;
-      ctx2.fillStyle = "#000";
-      ctx2.beginPath();
-      ctx2.moveTo(0, 0);
-      ctx2.arc(0, 0, 52, -1.05, 1.05);
-      ctx2.closePath();
-      ctx2.fill();
-
-      // jitter lines
-      ctx2.globalAlpha = 0.22 * g;
-      ctx2.strokeStyle = "#000";
-      ctx2.lineWidth = 2;
-      for (let i = 0; i < 5; i++) {
-        const a = -0.9 + i * 0.45 + Math.sin(t * 14 + i) * 0.04;
-        ctx2.beginPath();
-        ctx2.moveTo(Math.cos(a) * 30, Math.sin(a) * 30);
-        ctx2.lineTo(Math.cos(a) * 60, Math.sin(a) * 60);
-        ctx2.stroke();
+        ctx2.globalAlpha = a;
+        ctx2.fillStyle = "#000";
+        ctx2.fillRect(xx * px, yy * px, px, px);
       }
-      ctx2.restore();
-    }
-
-    // invuln ring
-    if (inv > 0.001) {
-      ctx2.globalAlpha = 0.30;
-      ctx2.lineWidth = 1;
-      ctx2.beginPath();
-      ctx2.arc(0, 0, 56, 0, Math.PI * 2);
-      ctx2.stroke();
-      ctx2.globalAlpha = 1;
     }
 
     ctx2.restore();
+    ctx2.globalAlpha = 1;
   }
 
-  function drawEnemyInk(ctx2, x, y, r, hit, t, type) {
-    x = snap(x); y = snap(y);
-    ctx2.save();
-    ctx2.translate(x, y);
+  // ===== Player sprites (24x32) =====
+  // NOTE: 고해상 “픽셀룩”을 위해 px(픽셀 크기)를 화면 비율에 따라 자동 조절
+  const P_IDLE_R = spriteFromStrings([
+    "          ++++++        ",
+    "        ++######++      ",
+    "       +##########+     ",
+    "       +###++++### +    ",
+    "        ++  ++  ++      ",
+    "          ++++++        ",
+    "        ..++##++..      ",
+    "      ..+++####+++..    ",
+    "     ..++########++..   ",
+    "     ..+##########+..   ",
+    "      .+###++++###++.   ",
+    "      .+##+    +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+###++++###.     ",
+    "      .++########+.     ",
+    "       .+########+.     ",
+    "       .+########+.     ",
+    "       .+##++++##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "        .++    ++.      ",
+    "        .++    ++.      ",
+    "        .++    ++.      ",
+    "       ..++    ++..     ",
+    "      ..+++    +++..    ",
+    "      ..+ +    + +..    ",
+    "        .+      +.      ",
+    "        .+      +.      ",
+  ]);
 
-    ctx2.strokeStyle = "#000";
-    ctx2.lineCap = "square";
+  const P_WALK1_R = spriteFromStrings([
+    "          ++++++        ",
+    "        ++######++      ",
+    "       +##########+     ",
+    "       +###++++### +    ",
+    "        ++  ++  ++      ",
+    "          ++++++        ",
+    "        ..++##++..      ",
+    "      ..+++####+++..    ",
+    "     ..++########++..   ",
+    "     ..+##########+..   ",
+    "      .+###++++###++.   ",
+    "      .+##+    +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+###++++###.     ",
+    "      .++########+.     ",
+    "       .+########+.     ",
+    "       .+########+.     ",
+    "       .+##++++##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "        .++   +++.      ",
+    "        .++  +++..      ",
+    "        .++ ++....      ",
+    "       ..++++.....      ",
+    "      ..+++..           ",
+    "      ..+ +.            ",
+    "        .+              ",
+    "        .+              ",
+  ]);
 
-    // body: rough torn (type별 모양 차)
-    ctx2.globalAlpha = hit > 0 ? 0.95 : 0.78;
-    ctx2.lineWidth = type === "brute" ? 4 : 3;
+  const P_WALK2_R = spriteFromStrings([
+    "          ++++++        ",
+    "        ++######++      ",
+    "       +##########+     ",
+    "       +###++++### +    ",
+    "        ++  ++  ++      ",
+    "          ++++++        ",
+    "        ..++##++..      ",
+    "      ..+++####+++..    ",
+    "     ..++########++..   ",
+    "     ..+##########+..   ",
+    "      .+###++++###++.   ",
+    "      .+##+    +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+###++++###.     ",
+    "      .++########+.     ",
+    "       .+########+.     ",
+    "       .+########+.     ",
+    "       .+##++++##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "      ..+++   ++..      ",
+    "      ..+++  ++..       ",
+    "      ....++ ++.        ",
+    "      .....++++..       ",
+    "           ..+++..      ",
+    "            .+ +..      ",
+    "              +.        ",
+    "              +.        ",
+  ]);
 
-    ctx2.beginPath();
-    const seg = type === "dart" ? 14 : 18;
-    for (let i = 0; i <= seg; i++) {
-      const a = (i / seg) * Math.PI * 2;
-      const wob = 1 + Math.sin(t * 8 + i) * (type === "dart" ? 0.16 : 0.12);
-      const jag = (i % 3 === 0) ? 4 : -2;
-      const rr = r * wob + jag;
-      const px = Math.cos(a) * rr;
-      const py = Math.sin(a) * rr;
-      if (i === 0) ctx2.moveTo(px, py);
-      else ctx2.lineTo(px, py);
+  // Slash frames (more aggressive sword pixels)
+  const P_SLASH1_R = spriteFromStrings([
+    "          ++++++        ",
+    "        ++######++      ",
+    "       +##########+     ",
+    "       +###++++### +    ",
+    "        ++  ++  ++      ",
+    "          ++++++        ",
+    "        ..++##++..      ",
+    "      ..+++####+++..    ",
+    "     ..++########++..   ",
+    "     ..+##########+..   ",
+    "      .+###++++###++.   ",
+    "      .+##+    +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+###++++###.     ",
+    "      .++########+.     ",
+    "       .+########+.     ",
+    "       .+########+.     ",
+    "       .+##++++##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.  +  ",
+    "       .+##+  +##+.  +  ",
+    "       .+##+  +##+.  +  ",
+    "       .+##+  +##+.  +  ",
+    "        .++    ++.  ++  ",
+    "        .++    ++. +++  ",
+    "        .++    ++. +++  ",
+    "       ..++    ++..+++  ",
+    "      ..+++    +++..++  ",
+    "      ..+ +    + +..+   ",
+    "        .+      +.  +   ",
+    "        .+      +.      ",
+  ]);
+
+  const P_SLASH2_R = spriteFromStrings([
+    "          ++++++        ",
+    "        ++######++      ",
+    "       +##########+     ",
+    "       +###++++### +    ",
+    "        ++  ++  ++      ",
+    "          ++++++        ",
+    "        ..++##++..      ",
+    "      ..+++####+++..    ",
+    "     ..++########++..   ",
+    "     ..+##########+..   ",
+    "      .+###++++###++.   ",
+    "      .+##+    +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+###++++###.     ",
+    "      .++########+.     ",
+    "       .+########+.     ",
+    "       .+########+.     ",
+    "       .+##++++##+.   ++",
+    "       .+##+  +##+.  +++",
+    "       .+##+  +##+. ++++",
+    "       .+##+  +##+. ++++",
+    "       .+##+  +##+. ++++",
+    "       .+##+  +##+.  +++",
+    "        .++    ++.   ++ ",
+    "        .++    ++.      ",
+    "        .++    ++.      ",
+    "       ..++    ++..     ",
+    "      ..+++    +++..    ",
+    "      ..+ +    + +..    ",
+    "        .+      +.      ",
+    "        .+      +.      ",
+  ]);
+
+  const P_SLASH3_R = spriteFromStrings([
+    "          ++++++        ",
+    "        ++######++      ",
+    "       +##########+     ",
+    "       +###++++### +    ",
+    "        ++  ++  ++      ",
+    "          ++++++        ",
+    "        ..++##++..      ",
+    "      ..+++####+++..    ",
+    "     ..++########++..   ",
+    "     ..+##########+..   ",
+    "      .+###++++###++.   ",
+    "      .+##+    +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+##+ ++ +##+.    ",
+    "      .+###++++###.     ",
+    "      .++########+.     ",
+    "       .+########+.     ",
+    "       .+########+.     ",
+    "       .+##++++##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "        .++    ++.      ",
+    "        .++    ++.      ",
+    "        .++    ++.      ",
+    "       ..++    ++..     ",
+    "      ..+++    +++..    ",
+    "      ..+ +    + +..    ",
+    "        .+      +.      ",
+    "        .+      +.      ",
+  ]);
+
+  // Guard frame (add chunky front shield pixels)
+  const P_GUARD_R = spriteFromStrings([
+    "          ++++++        ",
+    "        ++######++      ",
+    "       +##########+     ",
+    "       +###++++### +    ",
+    "        ++  ++  ++      ",
+    "          ++++++        ",
+    "        ..++##++..      ",
+    "      ..+++####+++..    ",
+    "     ..++########++..   ",
+    "     ..+##########+..   ",
+    "      .+###++++###++.   ",
+    "      .+##+    +##+.  + ",
+    "      .+##+ ++ +##+. +++",
+    "      .+##+ ++ +##+. +++",
+    "      .+###++++###. +++ ",
+    "      .++########+.  +  ",
+    "       .+########+.     ",
+    "       .+########+.     ",
+    "       .+##++++##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "       .+##+  +##+.     ",
+    "        .++    ++.      ",
+    "        .++    ++.      ",
+    "        .++    ++.      ",
+    "       ..++    ++..     ",
+    "      ..+++    +++..    ",
+    "      ..+ +    + +..    ",
+    "        .+      +.      ",
+    "        .+      +.      ",
+  ]);
+
+  // ===== Enemy sprites (28x28) =====
+  const E_WRAITH = spriteFromStrings([
+    "            ....            ",
+    "          ..++++..          ",
+    "        ..++####++..        ",
+    "       .++########++..      ",
+    "      .+###########+..      ",
+    "     .+####++++####+..      ",
+    "     .+###++++++### +.      ",
+    "    ..+##++....++##+..      ",
+    "    ..+##+..++..+##+..      ",
+    "    ..+##+..++..+##+..      ",
+    "    ..+##++....++##+..      ",
+    "     .+###++++++### +.      ",
+    "     .+####++++####+..      ",
+    "      .+###########+..      ",
+    "       .++########++..      ",
+    "        ..++####++..        ",
+    "          ..++++..          ",
+    "            ....            ",
+    "         ..  ..  ..         ",
+    "       ..+..    ..+..       ",
+    "      .++..      ..++.      ",
+    "      .+..        ..+.      ",
+    "     ..+.          .+..     ",
+    "     ..+.          .+..     ",
+    "      .+.          .+.      ",
+    "      .++.        .++.      ",
+    "       ..++..  ..++..       ",
+    "         ..........         ",
+  ]);
+
+  const E_BRUTE = spriteFromStrings([
+    "          ..++++++..        ",
+    "        ..++######++..      ",
+    "       .++##########++.     ",
+    "      .+#############+.     ",
+    "     .+####++++++####+.     ",
+    "     .+###++....++### +.    ",
+    "    ..+##+..++..+##+..+.    ",
+    "    ..+##+..++..+##+..+.    ",
+    "    ..+##+..++..+##+..+.    ",
+    "     .+###++....++### +.    ",
+    "     .+####++++++####+.     ",
+    "      .+#############+.     ",
+    "       .++##########++.     ",
+    "        ..++######++..      ",
+    "          ..++++++..        ",
+    "        ..++..  ..++..      ",
+    "      ..++..      ..++..    ",
+    "     .++..          ..++.   ",
+    "     .+..            ..+.   ",
+    "    ..+.              .+..  ",
+    "    ..+.              .+..  ",
+    "     .+.              .+.   ",
+    "     .++.            .++.   ",
+    "      ..++..      ..++..    ",
+    "        ..++..  ..++..      ",
+    "          ..........        ",
+    "         ..++....++..       ",
+    "        ..++..  ..++..      ",
+  ]);
+
+  const E_DART = spriteFromStrings([
+    "            ..++..          ",
+    "          ..++##++..        ",
+    "         .++######++.       ",
+    "        .+##########+.      ",
+    "        .+###++++### +.     ",
+    "       ..+##+....+##+..     ",
+    "       ..+##+..+++##+..     ",
+    "       ..+##+..+++##+..     ",
+    "       ..+##+....+##+..     ",
+    "        .+###++++### +.     ",
+    "        .+##########+.      ",
+    "         .++######++.       ",
+    "          ..++##++..        ",
+    "            ..++..          ",
+    "         ..  ..  ..         ",
+    "       ..+..    ..+..       ",
+    "      .++..      ..++.      ",
+    "      .+..        ..+.      ",
+    "      .+.          .+.      ",
+    "      .+.          .+.      ",
+    "      .+.          .+.      ",
+    "      .++.        .++.      ",
+    "       ..++..  ..++..       ",
+    "         ..........         ",
+    "            ..              ",
+    "           .++.             ",
+    "          .++.              ",
+    "          ++.               ",
+  ]);
+
+  function pickPlayerSprite() {
+    // action priority
+    if (player.act === "slash") {
+      // 3 frames over 0.24s
+      const f = Math.min(2, Math.floor((player.animT / 0.24) * 3));
+      return f === 0 ? P_SLASH1_R : (f === 1 ? P_SLASH2_R : P_SLASH3_R);
     }
-    ctx2.closePath();
-    ctx2.stroke();
-
-    // eye dots (enemy marker)
-    ctx2.globalAlpha = 1;
-    ctx2.fillStyle = "#000";
-    ctx2.fillRect(-4, -3, 2, 2);
-    ctx2.fillRect(2, -3, 2, 2);
-
-    // tendrils
-    ctx2.globalAlpha = 0.55;
-    ctx2.lineWidth = 2;
-    const n = type === "brute" ? 7 : 6;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + Math.sin(t * 2) * 0.18;
-      const ex = Math.cos(a) * (r + 16 + (i % 2) * 12);
-      const ey = Math.sin(a) * (r + 10 + (i % 3) * 10);
-      ctx2.beginPath();
-      ctx2.moveTo(0, 0);
-      ctx2.quadraticCurveTo(ex * 0.35, ey * 0.35, ex, ey);
-      ctx2.stroke();
+    if (player.act === "dash") {
+      // reuse walk2 for dash feel
+      return P_WALK2_R;
     }
+    if (player.guarding) return P_GUARD_R;
 
-    // brute has “shoulder spike” lines
-    if (type === "brute") {
-      ctx2.globalAlpha = 0.55;
-      ctx2.lineWidth = 3;
-      ctx2.beginPath();
-      ctx2.moveTo(-r * 0.6, -r * 0.2);
-      ctx2.lineTo(-r * 1.2, -r * 0.7);
-      ctx2.moveTo(r * 0.6, -r * 0.2);
-      ctx2.lineTo(r * 1.2, -r * 0.7);
-      ctx2.stroke();
+    // walk/idle
+    const speed = Math.hypot(player.vx, player.vy);
+    if (speed > 40) {
+      const f = Math.floor((player.animT * 10) % 2);
+      return f === 0 ? P_WALK1_R : P_WALK2_R;
     }
+    return P_IDLE_R;
+  }
 
-    ctx2.restore();
+  function pickEnemySprite(type) {
+    if (type === "brute") return E_BRUTE;
+    if (type === "dart") return E_DART;
+    return E_WRAITH;
   }
 
   /* =========================
-     HUD
+     HUD / Game Over
   ========================= */
   function syncHUD() {
     hpFill.style.width = `${clamp(player.hp / player.hpMax, 0, 1) * 100}%`;
@@ -905,32 +1041,27 @@
      Update
   ========================= */
   function update(dt) {
-    // hit stop
     if (state.hitStop > 0) {
       state.hitStop -= 1;
       dt = 0;
     }
 
     state.t += dt;
+    player.animT += dt;
 
-    // mobile slash hold timer
     if (slashHoldT > 0) slashHoldT += dt;
 
-    // combo decay
     if (state.comboTimer > 0) {
       state.comboTimer -= dt;
       if (state.comboTimer <= 0) breakCombo();
     }
 
-    // ink regen (무게감: 조금 느리게)
     player.ink = clamp(player.ink + 16 * dt, 0, player.inkMax);
 
-    // cooldowns
     player.dashCD = Math.max(0, player.dashCD - dt);
     player.slashCD = Math.max(0, player.slashCD - dt);
     player.invuln = Math.max(0, player.invuln - dt);
 
-    // fx decay
     player.flash = Math.max(0, player.flash - dt * 4.2);
     player.swingFx = Math.max(0, player.swingFx - dt * 3.4);
 
@@ -942,7 +1073,6 @@
     if (k.has("a") || k.has("arrowleft")) mx -= 1;
     if (k.has("d") || k.has("arrowright")) mx += 1;
 
-    // joystick
     const jm = joy.mag > joy.dead ? joy.mag : 0;
     if (jm > 0) {
       mx += joy.dx * jm;
@@ -954,9 +1084,12 @@
       const nx = mx / mlen;
       const ny = my / mlen;
       input.mx = nx; input.my = ny;
-      // 무게감: 바라보는 방향도 살짝 느리게 따라감
+
       player.faceX = lerp(player.faceX, nx, clamp(9 * dt, 0, 1));
       player.faceY = lerp(player.faceY, ny, clamp(9 * dt, 0, 1));
+
+      if (nx < -0.15) player.facing = -1;
+      if (nx > 0.15) player.facing = 1;
     } else {
       input.mx = input.my = 0;
     }
@@ -966,18 +1099,21 @@
     if (player.guarding) player.guardFx = Math.min(1, player.guardFx + dt * 5.5);
     else player.guardFx = Math.max(0, player.guardFx - dt * 7.5);
 
-    // actions (keyboard one-shot)
+    // actions
     if (input.dash) { dash(); input.dash = false; }
     if (input.special) { specialInkBurst(); input.special = false; }
 
-    // keyboard slash: Shift+J = heavy
     if (input.slash) {
       const heavy = input.keys.has("shift");
       slashAttack(heavy);
       input.slash = false;
     }
 
-    // move physics (무게감: 가속/감속 느리게)
+    // act state auto reset
+    if (player.act === "slash" && player.animT > 0.26) player.act = "idle";
+    if (player.act === "dash" && player.animT > 0.18) player.act = "idle";
+
+    // physics (heavy)
     const baseSp = player.guarding ? 170 : 225;
     const accel = player.guarding ? 5.5 : 5.0;
     const ax = input.mx * baseSp * accel;
@@ -986,7 +1122,6 @@
     player.vx = player.vx + ax * dt;
     player.vy = player.vy + ay * dt;
 
-    // friction
     const fr = player.guarding ? 9.5 : 7.2;
     player.vx = lerp(player.vx, 0, clamp(fr * dt, 0, 1));
     player.vy = lerp(player.vy, 0, clamp(fr * dt, 0, 1));
@@ -994,17 +1129,17 @@
     player.x += player.vx * dt;
     player.y += player.vy * dt;
 
-    // bounds
     player.x = clamp(player.x, 50, WORLD.w - 50);
     player.y = clamp(player.y, 70, WORLD.h - 50);
 
-    // enemies update + collision
+    // enemy update + collision
     for (const e of enemies) {
+      e.animT += dt;
+
       const dx = player.x - e.x;
       const dy = player.y - e.y;
       const [nx, ny] = norm(dx, dy);
 
-      // type별 움직임 살짝 차이
       const drift = (e.type === "dart") ? 0.12 : 0.08;
       const wob = Math.sin(state.t * 2.2 + e.wob) * drift;
 
@@ -1020,7 +1155,6 @@
           const dmg = e.type === "brute" ? base + 4 : (e.type === "dart" ? base - 2 : base);
 
           if (player.guarding) {
-            // guard reduces + gives ink
             player.hp -= Math.max(1, Math.floor(dmg * 0.22));
             player.ink = clamp(player.ink + 12, 0, player.inkMax);
 
@@ -1040,7 +1174,7 @@
           }
 
           player.invuln = 0.38;
-          burstInk(player.x, player.y, 0.9);
+          burstDots(player.x, player.y, 0.9);
 
           if (player.hp <= 0) {
             player.hp = 0;
@@ -1050,27 +1184,15 @@
       }
     }
 
-    // update particles
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
+    // dots
+    for (let i = dots.length - 1; i >= 0; i--) {
+      const p = dots[i];
       p.t -= dt;
-      if (p.t <= 0) { particles.splice(i, 1); continue; }
+      if (p.t <= 0) { dots.splice(i, 1); continue; }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.vx *= 0.90;
       p.vy *= 0.90;
-    }
-
-    // scratches
-    for (let i = scratches.length - 1; i >= 0; i--) {
-      const s = scratches[i];
-      s.t -= dt;
-      if (s.t <= 0) { scratches.splice(i, 1); continue; }
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
-      s.vx *= 0.88;
-      s.vy *= 0.88;
-      s.a += dt * 4.2;
     }
 
     // slashes
@@ -1080,13 +1202,83 @@
       if (s.t <= 0) slashes.splice(i, 1);
     }
 
-    // score/hi
     if (state.score > state.hi) {
       state.hi = state.score;
       localStorage.setItem("ink_hi", String(state.hi));
     }
 
     syncHUD();
+  }
+
+  /* =========================
+     Draw helpers (cone + pixel stroke)
+  ========================= */
+  function drawCone(ctx2, sx, sy, fx, fy, reach, halfAngle, alpha) {
+    const ang = Math.atan2(fy, fx);
+    ctx2.save();
+    ctx2.translate(sx, sy);
+    ctx2.rotate(ang);
+
+    ctx2.globalAlpha = alpha;
+    ctx2.fillStyle = "#000";
+    ctx2.beginPath();
+    ctx2.moveTo(0, 0);
+    ctx2.arc(0, 0, reach, -halfAngle, halfAngle);
+    ctx2.closePath();
+    ctx2.fill();
+
+    ctx2.globalAlpha = Math.min(1, alpha + 0.18);
+    ctx2.strokeStyle = "#000";
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    ctx2.arc(0, 0, reach, -halfAngle, halfAngle);
+    ctx2.stroke();
+
+    ctx2.globalAlpha = alpha * 0.55;
+    ctx2.lineWidth = 1;
+    ctx2.beginPath();
+    ctx2.arc(0, 0, reach * 0.72, 0, Math.PI * 2);
+    ctx2.stroke();
+
+    ctx2.restore();
+    ctx2.globalAlpha = 1;
+  }
+
+  function drawPixelStroke(ctx2, x, y, nx, ny, heavy, t, px) {
+    // “획”을 픽셀 블록으로 찍어서 더 도트 느낌
+    // 중심에서 방향으로 여러 점 찍기
+    const len = heavy ? 120 : 90;
+    const w = heavy ? 7 : 5;
+
+    ctx2.save();
+    ctx2.globalAlpha = (heavy ? 0.36 : 0.28) * t;
+    ctx2.fillStyle = "#000";
+
+    // main line
+    for (let i = 0; i < len; i += 6) {
+      const k = i / len;
+      const ox = x + nx * i;
+      const oy = y + ny * i;
+      const jitter = (Math.sin((k * 9 + state.t * 12)) * (heavy ? 2.2 : 1.6));
+      const pxX = snap(ox + -ny * jitter);
+      const pxY = snap(oy + nx * jitter);
+      ctx2.fillRect(pxX - w, pxY - 1, w * 2, 2);
+    }
+
+    // side scratches
+    ctx2.globalAlpha = (heavy ? 0.26 : 0.20) * t;
+    for (let s = 0; s < (heavy ? 10 : 7); s++) {
+      const i = rand(len * 0.2, len * 0.95);
+      const ox = x + nx * i;
+      const oy = y + ny * i;
+      const side = (s % 2 ? 1 : -1) * rand(8, 18);
+      const sx = snap(ox + -ny * side);
+      const sy = snap(oy + nx * side);
+      ctx2.fillRect(sx, sy, rand(8, 18), 1);
+    }
+
+    ctx2.restore();
+    ctx2.globalAlpha = 1;
   }
 
   /* =========================
@@ -1097,11 +1289,10 @@
   }
 
   function drawBackground(vw, vh, camX, camY, sx, sy) {
-    // paper
     ctx.fillStyle = "#efe6cf";
     ctx.fillRect(0, 0, vw, vh);
 
-    // skyline parallax
+    // skyline
     ctx.save();
     ctx.translate(-camX * 0.35 + sx * 0.2, -camY * 0.18 + sy * 0.2);
     ctx.fillStyle = "#000";
@@ -1110,8 +1301,7 @@
     for (const b of skyline) {
       ctx.fillRect(b.x, b.y, b.w, b.h);
 
-      // dents/windows scratches
-      ctx.globalAlpha = 0.12;
+      ctx.globalAlpha = 0.10;
       for (let i = 0; i < b.dents; i++) {
         const wx = b.x + rand(6, b.w - 10);
         const wy = b.y + rand(10, b.h - 16);
@@ -1136,7 +1326,7 @@
 
     ctx.restore();
 
-    // floor strokes (heavier scratches)
+    // floor strokes
     ctx.save();
     ctx.translate(sx * 0.25, sy * 0.25);
     ctx.globalAlpha = 0.07;
@@ -1158,13 +1348,11 @@
     const vh = rect.height;
     ctx.imageSmoothingEnabled = false;
 
-    // camera: follow with a bit of lag (weight)
     const targetCamX = clamp(player.x - vw / 2, 0, WORLD.w - vw);
     const targetCamY = clamp(player.y - vh / 2, 0, WORLD.h - vh);
     state.camX = lerp(state.camX, targetCamX, clamp(6 * state.dt, 0, 1));
     state.camY = lerp(state.camY, targetCamY, clamp(6 * state.dt, 0, 1));
 
-    // shake
     let sx = 0, sy = 0;
     if (state.shake > 0) {
       const m = state.shake;
@@ -1176,124 +1364,81 @@
     const camX = state.camX;
     const camY = state.camY;
 
-    // BG
     drawBackground(vw, vh, camX, camY, sx, sy);
 
-    // world layer
+    // pixel size by viewport (high-res pixel look)
+    // - mobile: px ~ 2~3, desktop: px ~ 3~4
+    const px = clamp(Math.round(Math.min(vw, vh) / 220), 2, 4);
+
     ctx.save();
     ctx.translate(sx, sy);
 
-    // enemies
+    // enemies sprites
     for (const e of enemies) {
       const [x, y] = worldToScreen(e.x, e.y, camX, camY);
-      drawEnemyInk(ctx, x, y, e.r, e.hit, state.t, e.type);
+      const spr = pickEnemySprite(e.type);
+
+      // small wob + hit flash
+      const wob = Math.sin(e.animT * 8) * 2;
+      const a = e.hit > 0 ? 1 : 0.9;
+      drawSprite(ctx, spr, x, y + wob, px, a, false, 0);
     }
 
-    // cone telegraph (last slash)
+    // cone telegraph + pixel stroke
     if (slashes.length > 0) {
       const s0 = slashes[slashes.length - 1];
-      const [px, py] = worldToScreen(player.x, player.y, camX, camY);
+      const [px2, py2] = worldToScreen(player.x, player.y, camX, camY);
       const a = clamp(s0.t / s0.life, 0, 1);
-      drawCone(ctx, px, py, s0.nx, s0.ny, s0.reach, s0.half, (s0.heavy ? 0.22 : 0.16) * a);
+      drawCone(ctx, px2, py2, s0.nx, s0.ny, s0.reach, s0.half, (s0.heavy ? 0.22 : 0.16) * a);
+
+      // heavy brush “획” pixel stroke overlay
+      drawPixelStroke(ctx, px2 + s0.nx * 18, py2 + s0.ny * 18, s0.nx, s0.ny, s0.heavy, a, px);
     }
 
-    // player aura
+    // player sprite
     {
       const [x, y] = worldToScreen(player.x, player.y, camX, camY);
-      if (player.swingFx > 0.01) inkFlicker(ctx, x, y, 30, player.swingFx * 0.9, state.t);
-      if (player.flash > 0.01) inkFlicker(ctx, x, y, 26, player.flash * 0.7, state.t * 0.9);
-      if (player.guardFx > 0.01) inkFlicker(ctx, x, y, 34, player.guardFx * 0.8, state.t * 0.75);
 
-      drawHeroHongGildong(
-        ctx,
-        x, y,
-        player.faceX, player.faceY,
-        player.flash,
-        player.guardFx,
-        player.swingFx,
-        player.invuln,
-        state.t
-      );
-    }
-
-    // slash strokes (무게감: 다중 획 + 두꺼운 스크래치)
-    for (const s of slashes) {
-      const [x, y] = worldToScreen(s.x, s.y, camX, camY);
-      const t = clamp(s.t / s.life, 0, 1);
-      const ang = Math.atan2(s.ny, s.nx);
-
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(ang);
-
-      // main heavy stroke
-      ctx.globalAlpha = (s.heavy ? 0.92 : 0.86) * t;
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = s.w;
-      ctx.lineCap = "square";
-      ctx.beginPath();
-      ctx.arc(0, 0, s.r, -0.70, 0.70);
-      ctx.stroke();
-
-      // second stroke slightly offset (획 2겹)
-      ctx.globalAlpha = 0.46 * t;
-      ctx.lineWidth = Math.max(2, s.w * 0.22);
-      ctx.beginPath();
-      ctx.arc(0, -6, s.r - 8, -0.66, 0.66);
-      ctx.stroke();
-
-      // third scratch (잔선)
-      ctx.globalAlpha = 0.32 * t;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 7, s.r - 14, -0.62, 0.62);
-      ctx.stroke();
-
-      // tip sparks (검은 스크래치)
-      ctx.globalAlpha = (s.heavy ? 0.45 : 0.36) * t;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i < (s.heavy ? 10 : 7); i++) {
-        const yy = -10 + i * 2.4;
-        ctx.moveTo(s.r + rand(-2, 2), yy);
-        ctx.lineTo(s.r + rand(10, 22), yy + rand(-6, 6));
+      // flash aura (black-only)
+      if (player.flash > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = 0.12 * player.flash;
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.arc(x, y, 42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
-      ctx.stroke();
 
-      ctx.restore();
+      // guard aura
+      if (player.guardFx > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = 0.10 * player.guardFx;
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.arc(x, y, 52, -1.0, 1.0);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const spr = pickPlayerSprite();
+      const alpha = player.invuln > 0 ? 0.75 : 1;
+      drawSprite(ctx, spr, x, y, px, alpha, player.facing < 0, 0);
     }
 
-    // particles dots
-    for (const p of particles) {
+    // dots particles
+    for (const p of dots) {
       const [x, y] = worldToScreen(p.x, p.y, camX, camY);
       const a = clamp(p.t / p.life, 0, 1);
-      ctx.globalAlpha = 0.52 * a;
+      ctx.globalAlpha = 0.55 * a;
       ctx.fillStyle = "#000";
-      ctx.beginPath();
-      ctx.arc(x, y, p.size, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(snap(x), snap(y), p.size, p.size);
     }
-
-    // scratch lines
-    for (const s of scratches) {
-      const [x, y] = worldToScreen(s.x, s.y, camX, camY);
-      const a = clamp(s.t / s.life, 0, 1);
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(s.a);
-      ctx.globalAlpha = 0.35 * a;
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(-s.w * 0.5, 0);
-      ctx.lineTo(s.w * 0.5, 0);
-      ctx.stroke();
-      ctx.restore();
-    }
+    ctx.globalAlpha = 1;
 
     ctx.restore();
 
-    // vignette bars (무대감)
+    // vignette bars
     ctx.globalAlpha = 0.18;
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, vw, 18);
@@ -1317,16 +1462,21 @@
   }
 
   /* =========================
-     Boot
+     HUD / Overlay text
   ========================= */
-  resetGame(true);
-  requestAnimationFrame(loop);
-
-  // overlay 안내 (헤비 슬래시 안내 추가)
   document.getElementById("ovTitle").textContent = "INK SWORD";
   document.getElementById("ovBody").innerHTML =
     `<b>이동</b> WASD/방향키 · <b>베기</b> J (Shift+J = 헤비) · <b>가드</b> K(누름) · <b>대시</b> L · <b>잉크 폭발</b> I<br/>
      모바일: SLASH 짧게=라이트 / 길게(눌러서)=헤비 · 왼쪽 조이스틱 이동`;
 
-  // start/reset overlay는 HTML 그대로 사용
+  /* =========================
+     Boot
+  ========================= */
+  resetGame(true);
+  requestAnimationFrame(loop);
+
+  // initial overlay state: stop until START
+  state.running = false;
+
+  // keep overlay visible on load
 })();
