@@ -1,8 +1,8 @@
-/* game.js — v4 FULL REPLACE
-   - Player: 32x48 high-res pixel, Walk 4f / Slash 4f / Guard 2f
-   - Enemies: 32x32 pixel sprites (wraith/brute/dart)
-   - Heavy feel: longer hitstop, stronger shake, visible cone + pixel stroke
-   - Offline-ready friendly (no external assets required)
+/* game.js — v5 FULL REPLACE
+   - Player: HUMAN pixel sprite (32x48), Walk 4f / Slash 4f (big sword travel) / Guard 2f
+   - Enemies: 32x32 pixel sprites with 2-frame breathing animation
+   - Guard: shield cone + parry flash window (on press)
+   - Heavy feel: hitstop, shake, visible cone, brush-stroke flash
 */
 (() => {
   const canvas = document.getElementById("c");
@@ -99,6 +99,11 @@
     facing: 1, // 1 right, -1 left
 
     guarding: false,
+    guardHeld: false,
+    guardPressed: false, // edge
+    parryT: 0,           // time left
+    parryFlash: 0,       // visual flash
+
     dashCD: 0,
     slashCD: 0,
     invuln: 0,
@@ -163,18 +168,19 @@
       const r0 = Math.random();
       const type = r0 < 0.60 ? "wraith" : (r0 < 0.85 ? "brute" : "dart");
 
-      const baseHP = type === "brute" ? 70 : (type === "dart" ? 34 : 48);
-      const baseSp = type === "brute" ? 78 : (type === "dart" ? 150 : 110);
+      const baseHP = type === "brute" ? 76 : (type === "dart" ? 36 : 52);
+      const baseSp = type === "brute" ? 76 : (type === "dart" ? 156 : 112);
 
       enemies.push({
         type,
         x, y,
         r: type === "brute" ? 28 : (type === "dart" ? 18 : 22),
-        hp: baseHP + state.wave * (type === "brute" ? 10 : 7),
-        sp: baseSp + state.wave * (type === "dart" ? 2.2 : 1.6),
+        hp: baseHP + state.wave * (type === "brute" ? 11 : 7),
+        sp: baseSp + state.wave * (type === "dart" ? 2.3 : 1.7),
         hit: 0,
         animT: rand(0, 10),
         wob: rand(0, 999),
+        stun: 0,
       });
     }
   }
@@ -196,9 +202,16 @@
     player.vx = player.vy = 0;
     player.hp = player.hpMax;
     player.ink = player.inkMax;
+
     player.dashCD = 0;
     player.slashCD = 0;
     player.invuln = 0;
+
+    player.guardHeld = false;
+    player.guardPressed = false;
+    player.parryT = 0;
+    player.parryFlash = 0;
+
     player.flash = 0;
     player.guardFx = 0;
     player.act = "idle";
@@ -220,11 +233,11 @@
     dots.push({ x, y, vx, vy, life, t: life, size });
   }
   function burstDots(x, y, power = 1) {
-    const n = Math.floor(26 * power);
+    const n = Math.floor(28 * power);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
-      const s = (120 + Math.random() * 260) * power;
-      dot(x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.16, 0.52), rand(2, 4));
+      const s = (120 + Math.random() * 280) * power;
+      dot(x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.16, 0.55), rand(2, 4));
     }
   }
   function hitStop(frames) { state.hitStop = Math.max(state.hitStop, frames); }
@@ -253,8 +266,8 @@
       y: py + ny * 18,
       nx, ny,
       heavy,
-      reach: heavy ? 150 : 118,
-      half: heavy ? 0.92 : 0.72,
+      reach: heavy ? 160 : 125,
+      half: heavy ? 0.95 : 0.74,
       life, t: life,
     });
   }
@@ -263,12 +276,12 @@
     e.hp -= dmg;
     e.hit = 0.18;
 
-    burstDots(hx, hy, heavy ? 1.45 : 1.0);
-    shake(heavy ? 20 : 14);
-    hitStop(heavy ? 8 : 5);
-    haptic(heavy ? 34 : 18);
+    burstDots(hx, hy, heavy ? 1.55 : 1.0);
+    shake(heavy ? 22 : 14);
+    hitStop(heavy ? 9 : 5);
+    haptic(heavy ? 38 : 18);
 
-    player.flash = Math.max(player.flash, heavy ? 0.55 : 0.28);
+    player.flash = Math.max(player.flash, heavy ? 0.62 : 0.28);
 
     if (e.hp <= 0) {
       state.kills += 1;
@@ -277,7 +290,7 @@
       state.score += 16 + Math.floor(state.combo * 2.2);
       addCombo();
 
-      burstDots(e.x, e.y, 1.8);
+      burstDots(e.x, e.y, 1.9);
       enemies.splice(enemies.indexOf(e), 1);
 
       if (enemies.length === 0) {
@@ -300,17 +313,19 @@
 
     pushSlash(player.x, player.y, fx, fy, heavy);
 
-    const reach = heavy ? 150 : 118;
-    const half = heavy ? 0.92 : 0.72;
-    const dmg = heavy ? 40 : 18;
+    const reach = heavy ? 160 : 125;
+    const half = heavy ? 0.95 : 0.74;
+    const dmg = heavy ? 42 : 18;
 
     const [nx, ny] = norm(fx, fy);
-    player.vx += nx * (heavy ? 170 : 90);
-    player.vy += ny * (heavy ? 170 : 90);
+    player.vx += nx * (heavy ? 185 : 95);
+    player.vy += ny * (heavy ? 185 : 95);
 
     for (const e of [...enemies]) {
       if (!inCone(player.x, player.y, fx, fy, e.x, e.y, reach + e.r, half)) continue;
       dealDamage(e, dmg, lerp(player.x, e.x, 0.72), lerp(player.y, e.y, 0.72), heavy);
+      // slight stun on heavy
+      if (heavy) e.stun = Math.max(e.stun, 0.14);
     }
 
     player.act = "slash";
@@ -326,8 +341,8 @@
     player.invuln = 0.26;
 
     const [nx, ny] = norm(player.faceX || 1, player.faceY || 0);
-    player.vx += nx * 620;
-    player.vy += ny * 620;
+    player.vx += nx * 640;
+    player.vy += ny * 640;
 
     burstDots(player.x, player.y, 1.0);
     shake(14);
@@ -342,23 +357,68 @@
     if (player.ink < 60) return;
     player.ink -= 60;
 
-    player.flash = Math.max(player.flash, 0.62);
+    player.flash = Math.max(player.flash, 0.68);
 
-    const radius = 185;
-    burstDots(player.x, player.y, 2.4);
+    const radius = 190;
+    burstDots(player.x, player.y, 2.6);
     pushSlash(player.x, player.y, player.faceX || 1, player.faceY || 0, true);
 
     for (const e of [...enemies]) {
       const d = Math.hypot(e.x - player.x, e.y - player.y);
-      if (d <= radius + e.r) dealDamage(e, 30, e.x, e.y, true);
+      if (d <= radius + e.r) dealDamage(e, 32, e.x, e.y, true);
     }
 
-    shake(24);
-    hitStop(9);
-    haptic(42);
+    shake(26);
+    hitStop(10);
+    haptic(46);
 
     player.act = "slash";
     player.animT = 0;
+  }
+
+  /* =========================
+     Guard + Parry
+  ========================= */
+  function startParryWindow() {
+    player.parryT = 0.12;          // “딱” 눌렀을 때 패링 타이밍
+    player.parryFlash = 0.18;      // 번쩍 표시
+    shake(8);
+    hitStop(1);
+    haptic(10);
+  }
+
+  function tryParryOnContact(e) {
+    // called when enemy collides while guarding
+    if (player.parryT > 0) {
+      // parry success
+      player.parryT = 0;
+      player.parryFlash = Math.max(player.parryFlash, 0.24);
+
+      // reflect: enemy takes dmg and knockback
+      const dx = e.x - player.x;
+      const dy = e.y - player.y;
+      const [nx, ny] = norm(dx, dy);
+
+      e.x += nx * 26;
+      e.y += ny * 26;
+      e.stun = Math.max(e.stun, 0.22);
+
+      // parry damage (feels good)
+      dealDamage(e, 22, e.x, e.y, true);
+
+      // reward
+      player.ink = clamp(player.ink + 18, 0, player.inkMax);
+
+      // extra juice
+      burstDots(player.x + nx * 22, player.y + ny * 22, 1.2);
+      shake(20);
+      hitStop(8);
+      haptic(36);
+      addCombo();
+
+      return true;
+    }
+    return false;
   }
 
   /* =========================
@@ -368,7 +428,12 @@
     const k = e.key.toLowerCase();
     input.keys.add(k);
     if (k === "j") input.slashTap = true;
-    if (k === "k") input.guard = true;
+
+    if (k === "k") {
+      if (!input.guard) player.guardPressed = true; // edge
+      input.guard = true;
+    }
+
     if (k === "l") input.dash = true;
     if (k === "i") input.special = true;
   }, { passive: true });
@@ -441,6 +506,7 @@
   }
 
   let slashHoldT = 0;
+
   bindHold(btnSlash,
     () => { slashHoldT = 0.0001; },
     () => {
@@ -449,7 +515,15 @@
       slashAttack(heavy);
     }
   );
-  bindHold(btnGuard, () => (input.guard = true), () => (input.guard = false));
+
+  bindHold(btnGuard,
+    () => {
+      if (!input.guard) player.guardPressed = true; // edge
+      input.guard = true;
+    },
+    () => { input.guard = false; }
+  );
+
   bindHold(btnDash, () => { input.dash = true; }, () => {});
   bindHold(btnSpecial, () => { input.special = true; }, () => {});
 
@@ -490,118 +564,126 @@
     ctx2.globalAlpha = 1;
   }
 
-  // --- Player 32x48: Walk 4f / Slash 4f / Guard 2f ---
-  // NOTE: 전부 “검정 도트”만. (.+#만 사용)
-  // 원칙: 몸통/갓은 유지하고, 발/팔/칼 픽셀만 프레임별로 움직여서 부드럽게 보이게 함.
+  /* =========================
+     PLAYER (HUMAN) 32x48
+     - head/face, robe/coat, arms, legs
+     - sword is moved BIG across slash frames
+  ========================= */
 
-  // Base idle
+  // Legend: + solid, # solid(softer), . faint, ' ' empty
+  // Human silhouette (Hong-gildong-ish: headband + coat)
   const P_IDLE = spriteFromStrings([
-    "              ++++++++              ",
-    "          ++++############++++      ",
-    "        +++##################+++    ",
-    "       ++########################++ ",
-    "       +######++++########++++###+  ",
-    "        ++##++      ++##++      ++  ",
-    "            ++++++++++++             ",
-    "          ..++####++++####++..       ",
-    "        ..+++################+++..   ",
-    "      ..+++######################+++.",
-    "     ..++############################",
-    "     .+####++++################++++##",
-    "     .+###++        ####        ++###",
-    "     .+###++   ++   ####   ++   ++###",
-    "     .+###++   ++   ####   ++   ++###",
-    "     .+####++++################++++##",
-    "     .++############################+",
-    "      .+############################+",
-    "      .+############################+",
-    "      .+####++++++++++++############+",
-    "      .+####++          ++##########+",
-    "      .+####++          ++##########+",
-    "      .+####++          ++##########+",
-    "      .+####++          ++##########+",
-    "      .+####++          ++##########+",
-    "       .++##++            ++####++.. ",
-    "       .++##++            ++####++.. ",
-    "       .++##++            ++####++.. ",
-    "      ..++##++            ++####++.. ",
-    "     ..+++##++            ++####+++..",
-    "     ..+  ##++            ++##  +..  ",
-    "       .+ ###+            +## +.     ",
-    "       .+ ###             ### +.     ",
-    "       .+  ##+            +##  +.    ",
-    "       .+  ##+            +##  +.    ",
-    "       .+  ##+            +##  +.    ",
-    "        .++  ++          ++  ++.     ",
-    "        .++  ++          ++  ++.     ",
-    "        .++  ++          ++  ++.     ",
-    "       ..++  ++          ++  ++..    ",
-    "     ...+++  ++          ++  +++...   ",
-    "     ..+  +  ++          ++  +  +..   ",
-    "       .+      +        +      +.     ",
-    "       .+      +        +      +.     ",
-    "       .+      +        +      +.     ",
-    "          .++    +      +    ++.      ",
-    "          .++    +      +    ++.      ",
-    "                ..      ..            ",
+    "                ..++++..                ",
+    "              ..++####++..              ",
+    "             .++########++.             ",
+    "            .+###++++++###+.            ",
+    "            +##++..++..++##+            ",
+    "            +##+..++++..+##+            ",
+    "            +###++....++### +           ",
+    "             .++########++.             ",
+    "               ..++##++..               ",
+    "              ..++####++..              ",
+    "            ..++########++..            ",
+    "           .++############++.           ",
+    "          .+####++++++#####+.           ",
+    "          +###++      ++###+            ",
+    "          +##+          +##+            ",
+    "          +##+    ++    +##+            ",
+    "          +##+    ++    +##+            ",
+    "          +###++      ++###+            ",
+    "          .+####++++++####+.            ",
+    "           .++##########++.             ",
+    "            ..++######++..              ",
+    "              .++####++.                ",
+    "             .++######++.               ",
+    "            .+###++++###+.              ",
+    "            +##+      +##+              ",
+    "            +##+      +##+              ",
+    "            +##+      +##+              ",
+    "            +##+      +##+              ",
+    "            +##+      +##+              ",
+    "            +###++  ++###+              ",
+    "             .++##++##++.               ",
+    "               .++##++.                 ",
+    "              ..+####+..                ",
+    "            ..++######++..              ",
+    "           .++##++..++##++.             ",
+    "           +##+        +##+             ",
+    "           +##+        +##+             ",
+    "           +##+        +##+             ",
+    "           .++..      ..++.             ",
+    "            ..++..  ..++..              ",
+    "              ..++..++..                ",
+    "                ..++++..                ",
+    "                  ....                  ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
   ]);
 
-  // Walk frames: leg alternation + robe swing
-  const P_WALK1 = spriteFromStrings(P_IDLE.lines.map((row, i) => {
-    if (i === 39) return row.replace("++  ++", "++ ++ ");
-    if (i === 40) return row.replace("++  ++", "++ ++ ");
-    if (i === 41) return row.replace("+++...", "++....");
-    return row;
-  }));
-  const P_WALK2 = spriteFromStrings(P_IDLE.lines.map((row, i) => {
-    if (i === 39) return row.replace("++  ++", "++  + ");
-    if (i === 40) return row.replace("++  ++", "++  + ");
-    if (i === 41) return row.replace("+++...", "++++..");
-    return row;
-  }));
-  const P_WALK3 = spriteFromStrings(P_IDLE.lines.map((row, i) => {
-    if (i === 39) return row.replace("++  ++", " ++ ++");
-    if (i === 40) return row.replace("++  ++", " ++ ++");
-    if (i === 41) return row.replace("+++...", ".++++.");
-    return row;
-  }));
-  const P_WALK4 = spriteFromStrings(P_IDLE.lines.map((row, i) => {
-    if (i === 39) return row.replace("++  ++", " +  ++");
-    if (i === 40) return row.replace("++  ++", " +  ++");
-    if (i === 41) return row.replace("+++...", "..++++");
-    return row;
-  }));
+  // Walk 4 frames: legs alternate + coat swing
+  function tweak(lines, edits) {
+    const out = lines.slice();
+    for (const { i, from, to } of edits) out[i] = out[i].replace(from, to);
+    return out;
+  }
+  const P_WALK1 = spriteFromStrings(tweak(P_IDLE.lines, [
+    { i: 34, from: "+##+        +##+", to: "+##+      ++ +##+" },
+    { i: 35, from: "+##+        +##+", to: "+##+     ++  +##+" },
+    { i: 37, from: ".++..      ..++.", to: ".++..   ..  ..++." },
+  ]));
+  const P_WALK2 = spriteFromStrings(tweak(P_IDLE.lines, [
+    { i: 34, from: "+##+        +##+", to: "+##+   ++   +##+" },
+    { i: 35, from: "+##+        +##+", to: "+##+  ++    +##+" },
+    { i: 37, from: ".++..      ..++.", to: ".++..  ..   ..++." },
+  ]));
+  const P_WALK3 = spriteFromStrings(tweak(P_IDLE.lines, [
+    { i: 34, from: "+##+        +##+", to: "+##+ ++     +##+" },
+    { i: 35, from: "+##+        +##+", to: "+##+++      +##+" },
+    { i: 37, from: ".++..      ..++.", to: ".++..  ..   ..++." },
+  ]));
+  const P_WALK4 = spriteFromStrings(tweak(P_IDLE.lines, [
+    { i: 34, from: "+##+        +##+", to: "+##+ ++     +##+" },
+    { i: 35, from: "+##+        +##+", to: "+##+  ++    +##+" },
+    { i: 37, from: ".++..      ..++.", to: ".++..   ..  ..++." },
+  ]));
 
-  // Guard frames: add a “plate” in front (right side when facing right)
-  const P_GUARD1 = spriteFromStrings(P_IDLE.lines.map((row, i) => {
-    if (i >= 12 && i <= 16) return row + "  +++";
-    if (i === 17) return row + "  ++ ";
-    return row;
-  }));
-  const P_GUARD2 = spriteFromStrings(P_IDLE.lines.map((row, i) => {
-    if (i >= 12 && i <= 16) return row + " ++++";
-    if (i === 17) return row + "  ++ ";
-    return row;
-  }));
-
-  // Slash frames: sword arc pixels on the right; timing feels heavy
-  function addSwordArc(lines, phase) {
-    // phase 0..3
+  // Guard 2 frames: arm/shield posture (we add a “block” on the front side)
+  function addFrontShield(lines, phase) {
     return lines.map((row, i) => {
-      if (phase === 0 && (i === 18 || i === 19)) return row + "   ++";
-      if (phase === 1 && (i === 17 || i === 18 || i === 19)) return row + "  ++++";
-      if (phase === 2 && (i === 16 || i === 17 || i === 18)) return row + " ++++++";
-      if (phase === 3 && (i === 17 || i === 18)) return row + "   ++";
+      if (i >= 13 && i <= 19) return row + (phase === 0 ? "   ++##" : "  +++##");
+      if (i === 20) return row + (phase === 0 ? "    ++ " : "   +++");
       return row;
     });
   }
-  const P_SLASH1 = spriteFromStrings(addSwordArc(P_IDLE.lines, 0));
-  const P_SLASH2 = spriteFromStrings(addSwordArc(P_IDLE.lines, 1));
-  const P_SLASH3 = spriteFromStrings(addSwordArc(P_IDLE.lines, 2));
-  const P_SLASH4 = spriteFromStrings(addSwordArc(P_IDLE.lines, 3));
+  const P_GUARD1 = spriteFromStrings(addFrontShield(P_IDLE.lines, 0));
+  const P_GUARD2 = spriteFromStrings(addFrontShield(P_IDLE.lines, 1));
 
-  // --- Enemies 32x32 (3 types) ---
-  const E_WRAITH = spriteFromStrings([
+  // Slash 4 frames: BIG sword travel (far forward + arc)
+  function addSword(lines, phase) {
+    // phase: 0 windup, 1 swing, 2 far cut, 3 recover
+    return lines.map((row, i) => {
+      // sword occupies rows around torso
+      if (phase === 0 && (i === 18 || i === 19)) return row + "    ++";
+      if (phase === 1 && (i === 16 || i === 17 || i === 18)) return row + "   ++++";
+      if (phase === 2 && (i === 14 || i === 15 || i === 16 || i === 17)) return row + "  ++++++++";
+      if (phase === 2 && (i === 18 || i === 19)) return row + "   ++++++";
+      if (phase === 3 && (i === 17 || i === 18)) return row + "    +++";
+      return row;
+    });
+  }
+  const P_SLASH1 = spriteFromStrings(addSword(P_IDLE.lines, 0));
+  const P_SLASH2 = spriteFromStrings(addSword(P_IDLE.lines, 1));
+  const P_SLASH3 = spriteFromStrings(addSword(P_IDLE.lines, 2));
+  const P_SLASH4 = spriteFromStrings(addSword(P_IDLE.lines, 3));
+
+  /* =========================
+     ENEMIES 32x32 (2-frame breathe)
+  ========================= */
+  // Wraith (A/B)
+  const E_WRAITH_A = spriteFromStrings([
     "             .......            ",
     "          ..++#####++..         ",
     "        ..++#########++..       ",
@@ -635,8 +717,14 @@
     "                                ",
     "                                ",
   ]);
+  const E_WRAITH_B = spriteFromStrings(E_WRAITH_A.lines.map((r, i) => {
+    if (i === 18) return r.replace("..+.", ".++.");
+    if (i === 21) return r.replace(".+.", "++.");
+    return r;
+  }));
 
-  const E_BRUTE = spriteFromStrings([
+  // Brute (A/B)
+  const E_BRUTE_A = spriteFromStrings([
     "         ..++######++..         ",
     "       ..++##########++..       ",
     "      .++##############++.      ",
@@ -670,8 +758,14 @@
     "         ..          ..         ",
     "                                ",
   ]);
+  const E_BRUTE_B = spriteFromStrings(E_BRUTE_A.lines.map((r, i) => {
+    if (i === 15) return r.replace("..++....++..", "..++.. ..++..");
+    if (i === 23) return r.replace(".++.              .++.", ".++..            ..++.");
+    return r;
+  }));
 
-  const E_DART = spriteFromStrings([
+  // Dart (A/B)
+  const E_DART_A = spriteFromStrings([
     "            ..++++..            ",
     "          ..++####++..          ",
     "         .++########++.         ",
@@ -705,33 +799,36 @@
     "                                ",
     "                                ",
   ]);
+  const E_DART_B = spriteFromStrings(E_DART_A.lines.map((r, i) => {
+    if (i === 18) return r.replace(".+.              .+.", ".++            ++.");
+    if (i === 19) return r.replace(".+.              .+.", ".++            ++.");
+    return r;
+  }));
 
-  function pickEnemySprite(type) {
-    if (type === "brute") return E_BRUTE;
-    if (type === "dart") return E_DART;
-    return E_WRAITH;
+  function pickEnemySprite(e) {
+    const breathe = (Math.sin(e.animT * 6.5) > 0);
+    if (e.type === "brute") return breathe ? E_BRUTE_A : E_BRUTE_B;
+    if (e.type === "dart") return breathe ? E_DART_A : E_DART_B;
+    return breathe ? E_WRAITH_A : E_WRAITH_B;
   }
 
   function pickPlayerSprite() {
-    // action first
     if (player.act === "slash") {
       const t = player.animT;
-      // 4 frames across 0.34s (heavy feeling)
-      if (t < 0.10) return P_SLASH1;
-      if (t < 0.18) return P_SLASH2;
-      if (t < 0.28) return P_SLASH3;
-      return P_SLASH4;
+      if (t < 0.09) return P_SLASH1;   // windup
+      if (t < 0.16) return P_SLASH2;   // start swing
+      if (t < 0.28) return P_SLASH3;   // far cut (BIG)
+      return P_SLASH4;                 // recover
     }
+
     if (player.guarding) {
-      // pulse guard for presence
-      const g = (Math.sin(state.t * 10) > 0) ? P_GUARD1 : P_GUARD2;
-      return g;
+      // subtle guard anim even while holding
+      return (Math.sin(state.t * 12) > 0) ? P_GUARD1 : P_GUARD2;
     }
 
     const sp = Math.hypot(player.vx, player.vy);
     if (sp > 40) {
-      // 4-frame walk
-      player.walkT += state.dt * 9;
+      player.walkT += state.dt * 9.2;
       const f = Math.floor(player.walkT) % 4;
       return f === 0 ? P_WALK1 : (f === 1 ? P_WALK2 : (f === 2 ? P_WALK3 : P_WALK4));
     }
@@ -763,7 +860,7 @@
   }
 
   /* =========================
-     Draw helpers (cone + pixel stroke)
+     Draw helpers
   ========================= */
   function drawCone(sx, sy, fx, fy, reach, halfAngle, alpha) {
     const ang = Math.atan2(fy, fx);
@@ -779,7 +876,7 @@
     ctx.closePath();
     ctx.fill();
 
-    ctx.globalAlpha = Math.min(1, alpha + 0.12);
+    ctx.globalAlpha = Math.min(1, alpha + 0.14);
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -790,31 +887,51 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawPixelStroke(x, y, nx, ny, heavy, a) {
-    const len = heavy ? 140 : 105;
-    const w = heavy ? 8 : 6;
+  function drawBrushFlash(x, y, nx, ny, heavy, a) {
+    // stronger, “black lightning / brush whip”
+    const len = heavy ? 170 : 125;
+    const w = heavy ? 9 : 7;
 
     ctx.save();
     ctx.fillStyle = "#000";
-    ctx.globalAlpha = (heavy ? 0.34 : 0.26) * a;
 
-    for (let i = 0; i < len; i += 6) {
+    // core stroke
+    ctx.globalAlpha = (heavy ? 0.40 : 0.30) * a;
+    for (let i = 0; i < len; i += 5) {
       const k = i / len;
-      const jitter = Math.sin((k * 10 + state.t * 12)) * (heavy ? 2.6 : 1.8);
+      const jitter = Math.sin((k * 12 + state.t * 18)) * (heavy ? 3.0 : 2.1);
       const px = snap(x + nx * i - ny * jitter);
       const py = snap(y + ny * i + nx * jitter);
       ctx.fillRect(px - w, py - 1, w * 2, 2);
     }
 
-    ctx.globalAlpha = (heavy ? 0.22 : 0.18) * a;
-    for (let s = 0; s < (heavy ? 12 : 8); s++) {
-      const i = rand(len * 0.2, len * 0.95);
-      const side = (s % 2 ? 1 : -1) * rand(10, 20);
+    // side sparks
+    ctx.globalAlpha = (heavy ? 0.28 : 0.22) * a;
+    const sparks = heavy ? 14 : 9;
+    for (let s = 0; s < sparks; s++) {
+      const i = rand(len * 0.15, len * 0.98);
+      const side = (s % 2 ? 1 : -1) * rand(12, 24);
       const px = snap(x + nx * i - ny * side);
       const py = snap(y + ny * i + nx * side);
-      ctx.fillRect(px, py, rand(10, 22), 1);
+      ctx.fillRect(px, py, rand(12, 28), 1);
     }
 
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawParryFlash(x, y, fx, fy, alpha) {
+    // “딱” 눌렀을 때 번쩍 실드
+    const reach = 88;
+    const half = 0.72;
+    drawCone(x, y, fx, fy, reach, half, 0.28 * alpha);
+
+    ctx.save();
+    ctx.globalAlpha = 0.35 * alpha;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(x, y, 44, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
     ctx.globalAlpha = 1;
   }
@@ -833,6 +950,7 @@
 
     if (slashHoldT > 0) slashHoldT += dt;
 
+    // combo decay
     if (state.comboTimer > 0) {
       state.comboTimer -= dt;
       if (state.comboTimer <= 0) breakCombo();
@@ -841,12 +959,15 @@
     // regen ink
     player.ink = clamp(player.ink + 18 * dt, 0, player.inkMax);
 
+    // cooldowns
     player.dashCD = Math.max(0, player.dashCD - dt);
     player.slashCD = Math.max(0, player.slashCD - dt);
     player.invuln = Math.max(0, player.invuln - dt);
 
+    // flashes
     player.flash = Math.max(0, player.flash - dt * 4.6);
-    player.guardFx = player.guarding ? Math.min(1, player.guardFx + dt * 6.5) : Math.max(0, player.guardFx - dt * 9);
+    player.parryT = Math.max(0, player.parryT - dt);
+    player.parryFlash = Math.max(0, player.parryFlash - dt * 7);
 
     // move input
     let mx = 0, my = 0;
@@ -863,6 +984,7 @@
       my += joy.dy * jm;
     }
 
+    // face
     const mlen = Math.hypot(mx, my);
     if (mlen > 0.001) {
       const nx = mx / mlen;
@@ -873,26 +995,34 @@
       if (nx > 0.15) player.facing = 1;
     }
 
-    // guard state
+    // guard edge detect
+    player.guardPressed = false;
+    if (input.guard && !player.guardHeld) {
+      player.guardPressed = true;
+      player.guardHeld = true;
+      startParryWindow();
+    }
+    if (!input.guard && player.guardHeld) player.guardHeld = false;
+
     player.guarding = !!input.guard;
+    player.guardFx = player.guarding ? Math.min(1, player.guardFx + dt * 6.5) : Math.max(0, player.guardFx - dt * 9);
 
     // actions
     if (input.dash) { dash(); input.dash = false; }
     if (input.special) { specialInkBurst(); input.special = false; }
     if (input.slashTap) { slashAttack(false); input.slashTap = false; }
 
-    // action settle
+    // settle
     if (player.act === "slash" && player.animT > 0.34) player.act = "idle";
     if (player.act === "dash" && player.animT > 0.22) player.act = "idle";
 
     // movement (weighty)
-    const baseSp = player.guarding ? 175 : 245;
-    const accel = player.guarding ? 5.6 : 5.2;
+    const baseSp = player.guarding ? 175 : 250;
+    const accel = player.guarding ? 5.7 : 5.2;
     player.vx += mx * baseSp * accel * dt;
     player.vy += my * baseSp * accel * dt;
 
-    // friction
-    const fr = player.guarding ? 8.8 : 7.6;
+    const fr = player.guarding ? 9.2 : 7.6;
     player.vx = lerp(player.vx, 0, clamp(fr * dt, 0, 1));
     player.vy = lerp(player.vy, 0, clamp(fr * dt, 0, 1));
 
@@ -905,40 +1035,65 @@
     // enemies
     for (const e of enemies) {
       e.animT += dt;
+      e.stun = Math.max(0, e.stun - dt);
+
+      // chase vector
       const dx = player.x - e.x;
       const dy = player.y - e.y;
       const [nx, ny] = norm(dx, dy);
 
-      // slight wob so they don't feel like squares
+      // stunned: slow drift
+      const stunMul = e.stun > 0 ? 0.25 : 1;
+
+      // wobble
       const wob = Math.sin(state.t * 2.2 + e.wob) * (e.type === "dart" ? 0.14 : 0.10);
-      e.x += (nx * e.sp + -ny * e.sp * wob) * dt;
-      e.y += (ny * e.sp + nx * e.sp * wob) * dt;
+      e.x += (nx * e.sp + -ny * e.sp * wob) * dt * stunMul;
+      e.y += (ny * e.sp + nx * e.sp * wob) * dt * stunMul;
 
       e.hit = Math.max(0, e.hit - dt);
 
-      // collision damage
+      // collision
       const d = Math.hypot(dx, dy);
       if (d < e.r + player.r && player.invuln <= 0) {
-        const base = 10 + Math.floor(state.wave * 1.1);
-        const dmg = e.type === "brute" ? base + 4 : (e.type === "dart" ? base - 2 : base);
-
+        // guarding?
         if (player.guarding) {
-          player.hp -= Math.max(1, Math.floor(dmg * 0.25));
-          player.ink = clamp(player.ink + 14, 0, player.inkMax);
+          // try parry first
+          if (tryParryOnContact(e)) {
+            player.invuln = 0.18;
+            continue;
+          }
+
+          // normal block (reduced damage)
+          const base = 10 + Math.floor(state.wave * 1.1);
+          const dmg = e.type === "brute" ? base + 4 : (e.type === "dart" ? base - 2 : base);
+
+          player.hp -= Math.max(1, Math.floor(dmg * 0.22));
+          player.ink = clamp(player.ink + 12, 0, player.inkMax);
+
           shake(10);
           hitStop(3);
           haptic(14);
+
+          // push enemy away slightly
+          e.x -= nx * 10;
+          e.y -= ny * 10;
+          e.stun = Math.max(e.stun, 0.08);
         } else {
+          // take hit
+          const base = 10 + Math.floor(state.wave * 1.1);
+          const dmg = e.type === "brute" ? base + 4 : (e.type === "dart" ? base - 2 : base);
+
           player.hp -= dmg;
-          shake(20);
+          shake(22);
           hitStop(6);
           haptic(34);
           breakCombo();
+
+          burstDots(player.x, player.y, 1.0);
+          player.flash = Math.max(player.flash, 0.32);
         }
 
         player.invuln = 0.40;
-        player.flash = Math.max(player.flash, 0.32);
-        burstDots(player.x, player.y, 1.0);
 
         if (player.hp <= 0) {
           player.hp = 0;
@@ -958,7 +1113,7 @@
       p.vy *= 0.90;
     }
 
-    // slashes lifetime
+    // slashes
     for (let i = slashes.length - 1; i >= 0; i--) {
       slashes[i].t -= dt;
       if (slashes[i].t <= 0) slashes.splice(i, 1);
@@ -1010,12 +1165,32 @@
     for (const e of enemies) {
       const x = e.x - state.camX;
       const y = e.y - state.camY;
-      const spr = pickEnemySprite(e.type);
+      const spr = pickEnemySprite(e);
       const a = e.hit > 0 ? 1 : 0.92;
-      drawSprite(ctx, spr, x, y + Math.sin(e.animT * 7) * 2, px, a, false);
+
+      // tiny breathe bob
+      const bob = (Math.sin(e.animT * 6.5) > 0) ? 1 : 0;
+      drawSprite(ctx, spr, x, y + bob, px, a, false);
     }
 
-    // slash telegraph + stroke
+    // guard shield visuals
+    if (player.guarding) {
+      const x = player.x - state.camX;
+      const y = player.y - state.camY;
+      const fx = player.faceX || 1;
+      const fy = player.faceY || 0;
+
+      // main shield cone
+      drawCone(x, y, fx, fy, 92, 0.70, 0.14 + 0.12 * player.guardFx);
+
+      // parry flash
+      if (player.parryFlash > 0) {
+        const a = clamp(player.parryFlash / 0.24, 0, 1);
+        drawParryFlash(x, y, fx, fy, a);
+      }
+    }
+
+    // slash telegraph + brush flash (strong)
     if (slashes.length > 0) {
       const s = slashes[slashes.length - 1];
       const x = player.x - state.camX;
@@ -1023,10 +1198,10 @@
       const a = clamp(s.t / s.life, 0, 1);
 
       drawCone(x, y, s.nx, s.ny, s.reach, s.half, (s.heavy ? 0.26 : 0.18) * a);
-      drawPixelStroke(x + s.nx * 18, y + s.ny * 18, s.nx, s.ny, s.heavy, a);
+      drawBrushFlash(x + s.nx * 20, y + s.ny * 20, s.nx, s.ny, s.heavy, a);
     }
 
-    // player aura
+    // player aura + sprite
     {
       const x = player.x - state.camX;
       const y = player.y - state.camY;
@@ -1035,15 +1210,7 @@
         ctx.globalAlpha = 0.14 * player.flash;
         ctx.fillStyle = "#000";
         ctx.beginPath();
-        ctx.arc(x, y, 56, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-      if (player.guardFx > 0.01) {
-        ctx.globalAlpha = 0.10 * player.guardFx;
-        ctx.fillStyle = "#000";
-        ctx.beginPath();
-        ctx.arc(x, y, 60, -1.1, 1.1);
+        ctx.arc(x, y, 58, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
       }
@@ -1058,7 +1225,7 @@
       const x = p.x - state.camX;
       const y = p.y - state.camY;
       const a = clamp(p.t / p.life, 0, 1);
-      ctx.globalAlpha = 0.6 * a;
+      ctx.globalAlpha = 0.62 * a;
       ctx.fillStyle = "#000";
       ctx.fillRect(snap(x), snap(y), p.size, p.size);
     }
@@ -1066,7 +1233,7 @@
 
     ctx.restore();
 
-    // subtle top/bottom bars
+    // subtle bars
     ctx.globalAlpha = 0.18;
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, vw, 18);
@@ -1093,7 +1260,7 @@
   ========================= */
   document.getElementById("ovTitle").textContent = "INK SWORD";
   document.getElementById("ovBody").innerHTML =
-    `<b>이동</b> WASD/방향키 · <b>베기</b> J (모바일 SLASH 홀드=헤비) · <b>가드</b> K / GUARD · <b>대시</b> L / DASH · <b>잉크 폭발</b> I / INK BURST`;
+    `<b>이동</b> WASD/방향키 · <b>베기</b> J (모바일 SLASH 홀드=헤비) · <b>가드</b> K / GUARD (딱 눌렀을 때 패링) · <b>대시</b> L / DASH · <b>잉크 폭발</b> I / INK BURST`;
 
   startBtn.addEventListener("click", () => {
     overlay.classList.add("hide");
@@ -1110,19 +1277,31 @@
   /* =========================
      Boot
   ========================= */
-  function syncHUD() {
-    hpFill.style.width = `${clamp(player.hp / player.hpMax, 0, 1) * 100}%`;
-    spFill.style.width = `${clamp(player.ink / player.inkMax, 0, 1) * 100}%`;
-    scoreText.textContent = String(state.score);
-    hiText.textContent = String(state.hi);
-    killText.textContent = String(state.kills);
-    waveText.textContent = String(state.wave);
-    comboText.textContent = String(state.combo);
-    rankText.textContent = state.rank;
-  }
-
-  // initial spawn
   resetGame();
   requestAnimationFrame(loop);
   state.running = false;
+
+  /* =========================
+     (Internal) touch slash hold timer
+  ========================= */
+  let slashHoldT = 0;
+
+  // Hook: hold timer update
+  const _raf = requestAnimationFrame;
+  requestAnimationFrame = function wrappedRAF(fn) {
+    return _raf(function (ts) {
+      // update hold timer even if paused a little (still fine)
+      if (slashHoldT > 0 && state.running && state.hitStop <= 0) slashHoldT += state.dt;
+      fn(ts);
+    });
+  };
+
+  // Re-bind slash hold since we wrapped RAF after earlier binds
+  btnSlash.addEventListener("pointerdown", () => { slashHoldT = 0.0001; }, { passive: true });
+  btnSlash.addEventListener("pointerup", () => {
+    const heavy = slashHoldT >= 0.28;
+    slashHoldT = 0;
+    slashAttack(heavy);
+  }, { passive: true });
+  btnSlash.addEventListener("pointercancel", () => { slashHoldT = 0; }, { passive: true });
 })();
