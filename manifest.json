@@ -1,0 +1,9 @@
+{
+  "name": "Ink Sword — Seoul Brush Arena",
+  "short_name": "Ink Sword",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#efe6cf",
+  "theme_color": "#efe6cf",
+  "icons": []
+}
