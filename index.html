@@ -1,102 +1,14 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <title>Ink Sword — Seoul Brush Arena</title>
-
-  <meta name="theme-color" content="#efe6cf" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
-  <link rel="stylesheet" href="./style.css" />
-  <link rel="manifest" href="./manifest.json">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Ink Sword</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app" id="app">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand__title">INK SWORD</div>
-        <div class="brand__sub">Seoul Brush • Ink Duel</div>
-      </div>
+  <canvas id="c"></canvas>
 
-      <div class="hud">
-        <div class="hud__row">
-          <div class="meter">
-            <div class="meter__label">HP</div>
-            <div class="meter__bar"><div class="meter__fill" id="hpFill"></div></div>
-          </div>
-          <div class="meter">
-            <div class="meter__label">INK</div>
-            <div class="meter__bar"><div class="meter__fill" id="spFill"></div></div>
-          </div>
-        </div>
-        <div class="hud__row hud__row--small">
-          <div class="pill">SCORE <b id="scoreText">0</b></div>
-          <div class="pill">BEST <b id="hiText">0</b></div>
-          <div class="pill">KILLS <b id="killText">0</b></div>
-          <div class="pill">WAVE <b id="waveText">1</b></div>
-          <div class="pill">COMBO <b id="comboText">0</b></div>
-          <div class="pill">RANK <b id="rankText">-</b></div>
-        </div>
-      </div>
-    </header>
-
-    <main class="stage" id="stage">
-      <canvas id="c"></canvas>
-
-      <!-- Combo / Rank Pop -->
-      <div class="rank-pop" id="rankPop" aria-hidden="true">
-        <div class="rank-pop__rank" id="rankPopRank">A</div>
-        <div class="rank-pop__meta">
-          <span class="rank-pop__combo" id="rankPopCombo">x3</span>
-          <span class="rank-pop__sub" id="rankPopSub">묵기 연계!</span>
-        </div>
-      </div>
-
-      <div class="overlay" id="overlay">
-        <div class="panel">
-          <h2 id="ovTitle">INK SWORD</h2>
-          <p id="ovBody">
-            <b>이동</b> WASD/방향키 · <b>베기</b> J · <b>가드</b> K(누름) · <b>대시</b> L · <b>잉크 폭발</b> I<br/>
-            모바일: 왼쪽 조이스틱 이동 · 오른쪽 버튼(베기/가드/대시/폭발)
-          </p>
-          <div class="panel__btns">
-            <button class="btn btn--ink" id="startBtn">START</button>
-            <button class="btn" id="resetBtn">RESET</button>
-          </div>
-          <div class="panel__tip">
-            TIP: 가드(K) “딱 맞게” 누르면 패링 → 콤보가 더 잘 이어집니다.
-          </div>
-        </div>
-      </div>
-
-      <!-- Mobile Controls (조이스틱 1개만 사용) -->
-      <div class="touch" id="touchUI" aria-hidden="false">
-        <div class="stick" id="stick">
-          <div class="stick__base"></div>
-          <div class="stick__knob" id="knob"></div>
-        </div>
-
-        <div class="pad">
-          <button class="abtn" id="btnSlash" aria-label="Slash">SLASH</button>
-          <button class="abtn" id="btnGuard" aria-label="Guard">GUARD</button>
-          <button class="abtn" id="btnDash" aria-label="Dash">DASH</button>
-          <button class="abtn abtn--big" id="btnSpecial" aria-label="Ink Burst">INK BURST</button>
-        </div>
-      </div>
-    </main>
-
-    <footer class="foot">
-      <span>서예 스트로크 + 서울 스카이라인 + 콤보 랭크 연출</span>
-    </footer>
-  </div>
-
-  <script src="game.js?v=6"></script>
-  <script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js");
-  }
-</script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
