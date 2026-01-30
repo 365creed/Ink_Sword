@@ -1,96 +1,143 @@
-/* style.css - full replace */
+/* =========================
+   INK & HANJI THEME — FULL
+========================= */
 :root{
-  --bg:#efe6cf;
-  --ink:#101010;
-  --paper:#f4eddc;
+  --bg:#f1ead7;                 /* 한지 바탕 */
+  --paper:#f6f0df;
   --panel:#f7f1df;
-  --line:rgba(0,0,0,.18);
-  --soft:rgba(0,0,0,.08);
-  --accent:#1b1b1b;
-  --btn:#121212;
+  --ink:#141312;                /* 진먹 */
+  --ink-soft:rgba(20,19,18,.65);
+  --ink-faint:rgba(20,19,18,.35);
+  --wash:rgba(20,19,18,.08);    /* 먹 번짐 */
+  --line:rgba(20,19,18,.22);
+  --accent:#0e0d0c;
 }
 
 *{box-sizing:border-box;}
 html,body{height:100%;}
+
 body{
   margin:0;
-  background:var(--bg);
+  background:
+    radial-gradient(circle at 20% 10%, rgba(0,0,0,.05), transparent 40%),
+    radial-gradient(circle at 80% 90%, rgba(0,0,0,.06), transparent 45%),
+    var(--bg);
   color:var(--ink);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
-  overflow:hidden; /* 모바일 스크롤로 입력 씹힘 방지 */
+  font-family:
+    "Noto Serif KR",
+    "Apple SD Gothic Neo",
+    system-ui, serif;
+  overflow:hidden;
 }
 
+/* =========================
+   APP LAYOUT
+========================= */
 .app{
   height:100%;
   display:flex;
   flex-direction:column;
 }
 
+/* =========================
+   TOP BAR — 붓결 패널
+========================= */
 .topbar{
   display:flex;
   gap:14px;
   align-items:center;
-  padding:10px 12px;
-  background:linear-gradient(to bottom, rgba(255,255,255,.55), rgba(255,255,255,.08));
+  padding:12px 14px;
+  background:
+    linear-gradient(to bottom,
+      rgba(255,255,255,.65),
+      rgba(255,255,255,.18)
+    );
   border-bottom:1px solid var(--line);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.12);
 }
 
-.brand{min-width:170px;}
+.brand{
+  min-width:170px;
+}
 .brand__title{
   font-weight:900;
-  letter-spacing:.12em;
+  letter-spacing:.22em;
   font-size:16px;
 }
 .brand__sub{
-  opacity:.75;
-  font-size:12px;
   margin-top:2px;
+  font-size:12px;
+  opacity:.75;
+  letter-spacing:.12em;
 }
 
+/* =========================
+   HUD / METER — 먹 번짐
+========================= */
 .hud{flex:1;}
-.hud__row{display:flex; gap:10px; align-items:center; justify-content:flex-end;}
-.hud__row--small{margin-top:6px; flex-wrap:wrap; gap:8px;}
+.hud__row{
+  display:flex;
+  gap:12px;
+  justify-content:flex-end;
+}
+.hud__row--small{
+  margin-top:6px;
+  gap:8px;
+  flex-wrap:wrap;
+}
 
 .meter{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:10px;
   min-width:190px;
 }
 .meter__label{
   width:34px;
-  font-weight:800;
   font-size:12px;
+  font-weight:800;
   opacity:.8;
 }
 .meter__bar{
   flex:1;
   height:10px;
   border-radius:999px;
-  background:rgba(0,0,0,.08);
+  background:rgba(0,0,0,.10);
+  border:1px solid var(--line);
   overflow:hidden;
-  border:1px solid rgba(0,0,0,.12);
 }
 .meter__fill{
   height:100%;
   width:50%;
-  background:linear-gradient(90deg, rgba(0,0,0,.90), rgba(0,0,0,.65));
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0,0,0,.9),
+      rgba(0,0,0,.55)
+    );
   border-radius:999px;
+  filter: blur(.2px);
 }
 
+/* =========================
+   PILL — 서예 인장 느낌
+========================= */
 .pill{
-  padding:6px 10px;
+  padding:6px 12px;
   border-radius:999px;
   border:1px solid var(--line);
-  background:rgba(255,255,255,.35);
+  background:rgba(255,255,255,.42);
   font-size:12px;
   display:flex;
   gap:6px;
-  align-items:baseline;
 }
-.pill b{font-size:13px;}
+.pill b{
+  font-size:13px;
+}
 
+/* =========================
+   STAGE
+========================= */
 .stage{
   position:relative;
   flex:1;
@@ -103,118 +150,109 @@ body{
   width:100%;
   height:100%;
   display:block;
-  background:var(--bg);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(0,0,0,.04), transparent 55%),
+    var(--paper);
 }
 
-/* Rank Pop */
+/* =========================
+   RANK POP — 붓글자 등장
+========================= */
 .rank-pop{
   position:absolute;
   left:50%;
-  top:18%;
-  transform:translate(-50%,-50%) scale(.96);
+  top:20%;
+  transform:translate(-50%,-50%) scale(.95);
   opacity:0;
   pointer-events:none;
   display:flex;
   gap:12px;
-  align-items:center;
-  padding:12px 14px;
-  border-radius:16px;
+  padding:14px 18px;
+  border-radius:20px;
+  background:rgba(255,255,255,.55);
   border:1px solid var(--line);
-  background:rgba(255,255,255,.5);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 16px 45px rgba(0,0,0,.18);
+  box-shadow: 0 22px 55px rgba(0,0,0,.25);
 }
 .rank-pop__rank{
+  font-size:36px;
   font-weight:1000;
-  font-size:34px;
-  letter-spacing:.08em;
+  letter-spacing:.18em;
 }
-.rank-pop__meta{
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
-.rank-pop__combo{font-weight:900;}
-.rank-pop__sub{opacity:.75; font-size:12px;}
 .rank-pop.show{
-  animation: pop .65s ease forwards;
+  animation: inkPop .7s ease forwards;
 }
-@keyframes pop{
-  0%{opacity:0; transform:translate(-50%,-55%) scale(.92);}
-  30%{opacity:1; transform:translate(-50%,-50%) scale(1.02);}
-  100%{opacity:0; transform:translate(-50%,-45%) scale(1.02);}
+@keyframes inkPop{
+  0%{opacity:0; transform:translate(-50%,-60%) scale(.88);}
+  35%{opacity:1; transform:translate(-50%,-50%) scale(1.05);}
+  100%{opacity:0; transform:translate(-50%,-42%) scale(1);}
 }
 
-/* Overlay */
+/* =========================
+   OVERLAY PANEL — 족자
+========================= */
 .overlay{
   position:absolute;
   inset:0;
   display:flex;
-  align-items:center;
   justify-content:center;
-  padding:18px;
-  background:rgba(0,0,0,.25);
-  backdrop-filter: blur(6px);
+  align-items:center;
+  background:rgba(0,0,0,.28);
 }
 .overlay.hide{display:none;}
 
 .panel{
   width:min(520px, 92vw);
-  border-radius:18px;
+  padding:18px;
+  border-radius:22px;
   background:var(--panel);
-  border:1px solid rgba(0,0,0,.18);
-  box-shadow: 0 25px 70px rgba(0,0,0,.25);
-  padding:16px;
+  border:1px solid var(--line);
+  box-shadow: 0 30px 80px rgba(0,0,0,.35);
 }
 .panel h2{
-  margin:0 0 8px;
-  letter-spacing:.12em;
+  margin:0 0 10px;
   font-size:18px;
+  letter-spacing:.2em;
 }
 .panel p{
-  margin:0 0 12px;
   font-size:13px;
-  line-height:1.5;
-  opacity:.92;
+  line-height:1.6;
+  opacity:.9;
 }
-.panel__btns{
-  display:flex;
-  gap:10px;
-}
+
 .btn{
-  flex:1;
-  padding:12px 12px;
-  border-radius:14px;
-  border:1px solid rgba(0,0,0,.18);
-  background:rgba(255,255,255,.55);
+  padding:14px;
+  border-radius:18px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.6);
   font-weight:900;
-  letter-spacing:.08em;
+  letter-spacing:.1em;
 }
 .btn--ink{
-  background:linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.7));
+  background:
+    linear-gradient(180deg,
+      rgba(0,0,0,.92),
+      rgba(0,0,0,.65)
+    );
   color:#fff;
-  border:1px solid rgba(0,0,0,.45);
 }
-.panel__tip{
-  margin-top:10px;
+
+/* =========================
+   FOOTER
+========================= */
+.foot{
+  padding:8px 12px;
+  border-top:1px solid var(--line);
   font-size:12px;
   opacity:.75;
 }
 
-/* Footer */
-.foot{
-  padding:8px 12px;
-  border-top:1px solid var(--line);
-  background:rgba(255,255,255,.22);
-  font-size:12px;
-  opacity:.85;
-}
-
-/* Touch controls */
+/* =========================
+   TOUCH UI — 먹방울
+========================= */
 .touch{
   position:absolute;
   inset:0;
-  pointer-events:none; /* 자식만 pointer-events 활성 */
+  pointer-events:none;
   display:flex;
   justify-content:space-between;
   align-items:flex-end;
@@ -222,88 +260,46 @@ body{
 }
 
 .stick{
-  width:140px;
-  height:140px;
-  position:relative;
+  width:138px;
+  height:138px;
   pointer-events:auto;
-  touch-action:none; /* 스크롤/줌 방지 */
-  user-select:none;
-  -webkit-user-select:none;
 }
 .stick__base{
-  position:absolute;
   inset:0;
+  position:absolute;
   border-radius:999px;
-  background:rgba(255,255,255,.25);
-  border:1px solid rgba(0,0,0,.18);
-  box-shadow: inset 0 0 0 2px rgba(0,0,0,.06);
+  background:rgba(255,255,255,.28);
+  border:1px solid var(--line);
 }
 .stick__knob{
   position:absolute;
   left:50%;
   top:50%;
-  width:66px;
-  height:66px;
-  margin-left:-33px;
-  margin-top:-33px;
+  width:64px;
+  height:64px;
+  margin:-32px;
   border-radius:999px;
-  background:rgba(0,0,0,.10);
-  border:1px solid rgba(0,0,0,.22);
-  box-shadow: 0 18px 40px rgba(0,0,0,.15);
-  transform:translate(0,0);
-  transition: transform .02s linear;
-}
-.stick.stick--on .stick__knob{
-  background:rgba(0,0,0,.14);
+  background:rgba(0,0,0,.12);
+  border:1px solid var(--line);
+  box-shadow: 0 18px 45px rgba(0,0,0,.25);
 }
 
 .pad{
   pointer-events:auto;
-  touch-action:none;
-  user-select:none;
-  -webkit-user-select:none;
   display:grid;
   grid-template-columns: 110px 110px;
-  grid-auto-rows: 52px;
   gap:10px;
-  align-content:end;
 }
-
 .abtn{
-  border-radius:16px;
-  border:1px solid rgba(0,0,0,.18);
-  background:rgba(255,255,255,.52);
-  font-weight:1000;
-  letter-spacing:.06em;
-  box-shadow: 0 14px 35px rgba(0,0,0,.14);
-  transform: translateY(0);
+  height:52px;
+  border-radius:18px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.55);
+  font-weight:900;
 }
 .abtn--big{
-  grid-column: 1 / span 2;
-  height:58px;
-  background:linear-gradient(180deg, rgba(0,0,0,.88), rgba(0,0,0,.68));
+  grid-column:1/3;
+  height:60px;
+  background:linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.7));
   color:#fff;
-  border:1px solid rgba(0,0,0,.45);
-}
-.abtn.is-down{
-  transform: translateY(1px) scale(.99);
-  filter: brightness(.96);
-}
-.abtn.is-down{
-  transform: translateY(1px) scale(.99);
-  filter: brightness(.92);
-  box-shadow: 0 6px 16px rgba(0,0,0,.22);
-}
-
-@media (max-width: 560px){
-  .brand{min-width:120px;}
-  .meter{min-width:160px;}
-  .touch{padding:12px;}
-  .stick{width:128px; height:128px;}
-  .pad{grid-template-columns: 102px 102px;}
-}
-
-@media (hover:hover) and (pointer:fine){
-  /* PC에서는 터치 UI 살짝 덜 거슬리게 */
-  .touch{opacity:.85;}
 }
