@@ -1,9 +1,5 @@
-/* game.js — v5.3 FULL REPLACE
-   FIXED:
-   - update/draw/loop 완결
-   - camera 적용 → 화면 안보이던 문제 해결
-   - guard 이동 감쇠 / 가드 콘 시각화
-   - 모바일 패링 보정
+/* game.js — v6.0 FULL REPLACE
+   INK BRUSH RENDERING SYSTEM
 */
 
 (() => {
@@ -13,216 +9,221 @@
   /* =========================
      CONFIG
   ========================= */
-  const IS_TOUCH = "ontouchstart" in window;
-  const PARRY_BONUS = IS_TOUCH ? 1.4 : 1.0;
+  const DPR = window.devicePixelRatio || 1;
 
   const CONFIG = {
-    width: 360,
-    height: 640,
+    baseWidth: 360,
+    baseHeight: 640,
+    viewScale: 0.67,        // 🔥 가장 예쁜 비율
     gravity: 0.9,
     friction: 0.82
   };
+
+  const IS_TOUCH = "ontouchstart" in window;
 
   /* =========================
      STATE
   ========================= */
   const state = {
-    camX: 0,
-    camY: 0,
-    time: 0
+    time: 0,
+    camX: 0
   };
 
   /* =========================
-     PLAYER
+     PLAYER / ENEMY
   ========================= */
   const player = {
     x: 0,
-    y: 0,
+    y: 40,
     vx: 0,
-    vy: 0,
-    w: 24,
-    h: 40,
-    hp: 100,
-
     facing: 1,
-    faceX: 1,
-    faceY: 0,
-
     guarding: false,
     guardFx: 0,
-    parryTimer: 0,
-
     slashTimer: 0
   };
 
-  /* =========================
-     ENEMY (SAMPLE)
-  ========================= */
   const enemy = {
-    x: 160,
-    y: 0,
-    w: 26,
-    h: 42,
-    attackTimer: 0,
-    alive: true
+    x: 140,
+    y: 40,
+    alive: true,
+    hitFx: 0
   };
 
   /* =========================
      INPUT
   ========================= */
   const input = {
-    left: false,
-    right: false,
-    guard: false,
-    slash: false
+    left:false,
+    right:false,
+    guard:false,
+    slash:false
   };
 
   window.addEventListener("keydown", e => {
-    if (e.key === "ArrowLeft") input.left = true;
-    if (e.key === "ArrowRight") input.right = true;
-    if (e.key === "z") input.slash = true;
-    if (e.key === "x") input.guard = true;
+    if(e.key==="ArrowLeft") input.left = true;
+    if(e.key==="ArrowRight") input.right = true;
+    if(e.key==="z") input.slash = true;
+    if(e.key==="x") input.guard = true;
   });
   window.addEventListener("keyup", e => {
-    if (e.key === "ArrowLeft") input.left = false;
-    if (e.key === "ArrowRight") input.right = false;
-    if (e.key === "z") input.slash = false;
-    if (e.key === "x") input.guard = false;
+    if(e.key==="ArrowLeft") input.left = false;
+    if(e.key==="ArrowRight") input.right = false;
+    if(e.key==="z") input.slash = false;
+    if(e.key==="x") input.guard = false;
   });
 
   /* =========================
      UPDATE
   ========================= */
-  function update() {
+  function update(){
     state.time++;
 
-    let moveSpeed = 1.6;
-    if (player.guarding) moveSpeed *= 0.42;
-
-    if (input.left) player.vx -= moveSpeed;
-    if (input.right) player.vx += moveSpeed;
+    let speed = 1.6 * (IS_TOUCH ? 1.2 : 1);
+    if(input.left) player.vx -= speed;
+    if(input.right) player.vx += speed;
 
     player.vx *= CONFIG.friction;
     player.x += player.vx;
 
-    // facing
-    if (player.vx < -0.1) player.facing = -1;
-    if (player.vx > 0.1) player.facing = 1;
-    player.faceX = player.facing;
+    if(player.vx > 0.1) player.facing = 1;
+    if(player.vx < -0.1) player.facing = -1;
 
     // guard
-    if (input.guard) {
-      if (!player.guarding) {
-        player.parryTimer = Math.floor(10 * PARRY_BONUS);
-      }
-      player.guarding = true;
-    } else {
-      player.guarding = false;
-    }
-
-    player.guardFx += (player.guarding ? 1 : -1) * 0.2;
+    player.guarding = input.guard;
+    player.guardFx += (player.guarding ? 1 : -1) * 0.18;
     player.guardFx = Math.max(0, Math.min(1, player.guardFx));
 
-    if (player.parryTimer > 0) player.parryTimer--;
-
-    // enemy attack (dummy)
-    enemy.attackTimer++;
-    if (enemy.attackTimer > 120) {
-      enemy.attackTimer = 0;
-      checkParry();
+    // slash
+    if(input.slash && player.slashTimer <= 0){
+      player.slashTimer = 18;
+      enemy.hitFx = 1;
     }
+    if(player.slashTimer > 0) player.slashTimer--;
 
-    // camera follow
-    state.camX += (player.x - state.camX - CONFIG.width / 2) * 0.1;
+    enemy.hitFx *= 0.88;
+
+    // camera
+    state.camX += (player.x - state.camX - CONFIG.baseWidth/2) * 0.08;
   }
 
-  function checkParry() {
-    if (!player.guarding) return;
+  /* =========================
+     BRUSH STROKE UTILS
+  ========================= */
+  function brushStroke(path, baseWidth, alpha){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#111";
 
-    const dx = enemy.x - player.x;
-    const dist = Math.abs(dx);
-
-    if (dist < 60 && player.parryTimer > 0) {
-      // parry success
-      enemy.x += player.facing * 60;
+    for(let i=0;i<3;i++){
+      ctx.lineWidth = baseWidth + Math.random()*1.2;
+      ctx.beginPath();
+      ctx.moveTo(path[0].x, path[0].y);
+      for(let p of path){
+        ctx.lineTo(
+          p.x + (Math.random()-.5)*0.6,
+          p.y + (Math.random()-.5)*0.6
+        );
+      }
+      ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  /* =========================
+     DRAW CHARACTERS
+  ========================= */
+  function drawPlayer(){
+    const x = player.x;
+    const y = player.y;
+
+    brushStroke([
+      {x:x, y:y-42},
+      {x:x+player.facing*4, y:y-22},
+      {x:x, y:y}
+    ], 6, 0.9);
+
+    // slash trail
+    if(player.slashTimer > 0){
+      const t = player.slashTimer / 18;
+      brushStroke([
+        {x:x, y:y-28},
+        {x:x+player.facing*60*(1-t), y:y-40}
+      ], 4 + t*4, 0.7);
+    }
+
+    // guard bloom
+    if(player.guardFx > 0){
+      ctx.save();
+      ctx.globalAlpha = 0.15 * player.guardFx;
+      ctx.beginPath();
+      ctx.arc(
+        x + player.facing*18,
+        y-26,
+        40 * player.guardFx,
+        0, Math.PI*2
+      );
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawEnemy(){
+    if(!enemy.alive) return;
+
+    const x = enemy.x;
+    const y = enemy.y;
+
+    brushStroke([
+      {x:x, y:y-44},
+      {x:x-4, y:y-24},
+      {x:x, y:y}
+    ], 6, 0.85 + enemy.hitFx*0.3);
   }
 
   /* =========================
      DRAW
   ========================= */
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
     ctx.save();
-    ctx.translate(-state.camX, -state.camY);
+    ctx.scale(CONFIG.viewScale, CONFIG.viewScale);
+    ctx.translate(-state.camX,0);
 
     // ground
-    ctx.strokeStyle = "#000";
+    ctx.strokeStyle="#111";
+    ctx.lineWidth=2;
     ctx.beginPath();
-    ctx.moveTo(-1000, 40);
-    ctx.lineTo(2000, 40);
+    ctx.moveTo(-1000,40);
+    ctx.lineTo(2000,40);
     ctx.stroke();
 
-    // enemy
-    if (enemy.alive) {
-      ctx.fillRect(enemy.x - enemy.w / 2, enemy.y - enemy.h, enemy.w, enemy.h);
-    }
+    drawEnemy();
+    drawPlayer();
 
-    // player
-    ctx.fillRect(player.x - player.w / 2, player.y - player.h, player.w, player.h);
-
-    // guard cone
-    if (player.guardFx > 0) {
-      drawCone(
-        player.x,
-        player.y - 20,
-        player.faceX,
-        0,
-        100,
-        0.9,
-        0.22 * player.guardFx
-      );
-    }
-
-    ctx.restore();
-  }
-
-  function drawCone(x, y, fx, fy, len, angle, alpha) {
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.arc(
-      x,
-      y,
-      len,
-      Math.atan2(fy, fx) - angle,
-      Math.atan2(fy, fx) + angle
-    );
-    ctx.closePath();
-    ctx.fill();
     ctx.restore();
   }
 
   /* =========================
-     LOOP
+     LOOP / RESIZE
   ========================= */
-  function loop() {
+  function loop(){
     update();
     draw();
     requestAnimationFrame(loop);
   }
 
-  function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = CONFIG.width * dpr;
-    canvas.height = CONFIG.height * dpr;
-    canvas.style.width = CONFIG.width + "px";
-    canvas.style.height = CONFIG.height + "px";
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  function resize(){
+    canvas.width = CONFIG.baseWidth * DPR;
+    canvas.height = CONFIG.baseHeight * DPR;
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    ctx.setTransform(DPR,0,0,DPR,0,0);
   }
 
+  window.addEventListener("resize", resize);
   resize();
   loop();
 })();
