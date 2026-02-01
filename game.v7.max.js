@@ -1,5 +1,3 @@
-alert("🔥 THIS IS NEW GAME.JS");
-
 import { Engine } from "./core/engine.js";
 import { setScene } from "./core/state.js";
 import { IntroScene } from "./scene/intro.js";
