@@ -8,6 +8,6 @@ export function updateScene(){
   if(current) current.update();
 }
 
-export function drawScene(){
-  if(current) current.draw();
+export function drawScene(ctx){
+  if(current) current.draw(ctx);
 }
