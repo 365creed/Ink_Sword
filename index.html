@@ -1,22 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Ink Vengeance</title>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
 <body>
 
-<!-- ===== GAME LAYER ===== -->
-<canvas id="game"></canvas>
+  <!-- =============================
+       GAME CANVAS LAYER
+  ============================== -->
+  <canvas id="game"></canvas>
 
-<!-- ===== STORY LAYER ===== -->
-<div id="storyLayer" class="hidden">
-  <div id="storyText"></div>
-  <button id="storyNext">다음</button>
-</div>
-
-<!-- ===== UI LAYER ===== -->
-<div id="ui">
-  <div id="joystick">
-    <div id="stick"></div>
+  <!-- =============================
+       HUD LAYER
+  ============================== -->
+  <div id="hud">
+    <div id="chapterLabel">PROLOGUE</div>
+    <div id="hpBar">
+      <div id="hpFill"></div>
+    </div>
   </div>
-  <button id="attackBtn">⚔</button>
-  <button id="guardBtn">🛡</button>
-</div>
 
-<script src="game.js"></script>
+  <!-- =============================
+       STORY LAYER
+  ============================== -->
+  <div id="storyLayer" class="hidden">
+    <div id="storyBox">
+      <div id="storyText"></div>
+      <button id="storyNext">다음</button>
+    </div>
+  </div>
+
+  <!-- =============================
+       MOBILE CONTROL LAYER
+  ============================== -->
+  <div id="controlLayer">
+
+    <div id="joystick">
+      <div id="stick"></div>
+    </div>
+
+    <div id="actionButtons">
+      <button id="attackBtn">⚔</button>
+      <button id="guardBtn">⛨</button>
+    </div>
+
+  </div>
+
+  <!-- =============================
+       SCRIPT
+  ============================== -->
+  <script src="game.js"></script>
+
 </body>
+</html>
