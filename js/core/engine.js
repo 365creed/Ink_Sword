@@ -21,6 +21,7 @@ export class Engine {
     this.canvas.style.width = this.width + "px";
     this.canvas.style.height = this.height + "px";
     this.ctx.setTransform(dpr,0,0,dpr,0,0);
+    resizeScene(this.width, this.height);
   }
 
   start(){
