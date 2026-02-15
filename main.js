@@ -8,6 +8,7 @@ const ctx = canvas.getContext("2d");
 function resize() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  player.y = canvas.height / 2;
 }
 window.addEventListener("resize", resize);
 resize();
@@ -190,7 +191,7 @@ function update() {
       if (player.attacking) {
         e.hp -= 20;
       } else if (!player.guarding) {
-        player.hp -= 0.3;
+        player.hp = 0;
       }
     }
   });
