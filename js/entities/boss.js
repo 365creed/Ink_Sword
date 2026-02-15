@@ -1,45 +1,58 @@
-import { Layers } from "../render/layers.js";
-import { drawBrush } from "../render/brush.js";
-import { bleedInk } from "../render/ink.js";
-import { drawSkyline } from "../render/skyline.js";
-import { setScene } from "../core/state.js";
-import { PlayScene } from "./play.js";
+export class Boss {
+  constructor(x,y){
+    this.x = x;
+    this.y = y;
 
-const CHARS = [
-  [{x:180,y:200},{x:180,y:300}],                // 一
-  [{x:160,y:200},{x:200,y:200},{x:180,y:300}],  // 二
-  [{x:160,y:220},{x:200,y:220},{x:160,y:300},{x:200,y:300}],
-  [{x:150,y:200},{x:210,y:200},{x:180,y:260},{x:180,y:330}],
-  [{x:160,y:220},{x:200,y:220},{x:160,y:300},{x:200,y:300},{x:180,y:350}]
-];
+    this.w = 120;
+    this.h = 120;
 
-export class IntroScene{
-  constructor(){
-    this.step = 0;
-    this.timer = 0;
-    Layers.clear();
+    this.hp = 300;
+    this.alive = true;
+
+    this.phase = 1;
+    this.damage = 20;
+
+    this.speed = 80;
   }
 
-  update(){
-    this.timer++;
-    bleedInk(Layers.ink.getContext("2d"));
+  update(dt, player){
+    if(!this.alive) return;
 
-    if(this.timer === 10){
-      drawBrush(Layers.ink.getContext("2d"), CHARS[this.step]);
+    // 단순 이동 패턴
+    if(player.x < this.x){
+      this.x -= this.speed * dt;
+    }else{
+      this.x += this.speed * dt;
     }
 
-    if(this.timer > 90){
-      this.step++;
-      this.timer = 0;
-      Layers.ink.getContext("2d").clearRect(0,0,360,640);
-      if(this.step >= CHARS.length){
-        setScene(new PlayScene());
-      }
+    // 페이즈 변화
+    if(this.hp < 150){
+      this.phase = 2;
+      this.speed = 140;
+    }
+
+    if(this.hp <= 0){
+      this.alive = false;
     }
   }
 
-  draw(){
-    drawSkyline(Layers.bg.getContext("2d"));
-    Layers.compose();
+  draw(ctx){
+    if(!this.alive) return;
+
+    ctx.fillStyle = this.phase === 1 ? "purple" : "red";
+    ctx.fillRect(this.x,this.y,this.w,this.h);
+  }
+
+  takeDamage(dmg){
+    this.hp -= dmg;
+  }
+
+  getHitbox(){
+    return {
+      x:this.x,
+      y:this.y,
+      w:this.w,
+      h:this.h
+    };
   }
 }
