@@ -178,7 +178,10 @@ function update() {
 
   // 카메라 이동
   cameraX = player.x - 200;
-  if (cameraX < 0) cameraX = 0;
+if (cameraX < 0) cameraX = 0;
+if (cameraX > stageLength - canvas.width) {
+  cameraX = stageLength - canvas.width;
+}
 
   // 적 AI
   enemies.forEach(e => {
@@ -214,16 +217,21 @@ function update() {
   enemies = enemies.filter(e => e.hp > 0);
 
   // HUD 업데이트
-  document.getElementById("hpFill").style.width = player.hp + "%";
+  const hpPercent = Math.max(0, Math.min(100, player.hp));
+  document.getElementById("hpFill").style.width = hpPercent + "%";
+
 
   // 스테이지 끝
-  if (player.x > stageLength - 300 && !boss) {
+  if (player.x > stageLength - 400 && !boss) {
     spawnBoss();
   }
 
   // 챕터 종료
   if (boss && boss.hp <= 0) {
-    nextChapter();
+    nextChapter(
+       for (let i = 600; i < stageLength - 400; i += 500) {
+       spawnEnemy(i);
+    );
   }
 }
 
