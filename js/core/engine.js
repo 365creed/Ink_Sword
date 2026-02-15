@@ -26,7 +26,7 @@ export class Engine {
   start(){
     const loop = ()=>{
       updateScene();
-      drawScene();
+      drawScene(this.ctx);
       requestAnimationFrame(loop);
     };
     loop();
