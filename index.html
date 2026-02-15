@@ -1,14 +1,22 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>Ink Sword</title>
-  <link rel="stylesheet" href="style.css">
-</head>
 <body>
-  <canvas id="c"></canvas>
 
-  <script type="module" src="game.v7.max.js"></script>
+<!-- ===== GAME LAYER ===== -->
+<canvas id="game"></canvas>
+
+<!-- ===== STORY LAYER ===== -->
+<div id="storyLayer" class="hidden">
+  <div id="storyText"></div>
+  <button id="storyNext">다음</button>
+</div>
+
+<!-- ===== UI LAYER ===== -->
+<div id="ui">
+  <div id="joystick">
+    <div id="stick"></div>
+  </div>
+  <button id="attackBtn">⚔</button>
+  <button id="guardBtn">🛡</button>
+</div>
+
+<script src="game.js"></script>
 </body>
-</html>
