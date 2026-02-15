@@ -1,14 +1,32 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  background: #efe9dc;
-  overflow: hidden;
-  touch-action: none;
+/* STORY LAYER */
+#storyLayer {
+  position: fixed;
+  inset: 0;
+  background: #000000dd;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  z-index: 10;
 }
 
-canvas {
-  display: block;
-  margin: 0 auto;
-  background: #efe9dc;
-  image-rendering: crisp-edges;
+#storyText {
+  max-width: 600px;
+  text-align: center;
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+#storyNext {
+  margin-top: 40px;
+  padding: 12px 30px;
+  background: white;
+  border: none;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none;
 }
