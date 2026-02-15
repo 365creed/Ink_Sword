@@ -1,27 +1,51 @@
-export const Layers = {
-  bg:null,
-  ink:null,
-  fx:null,
-  ctx:null,
+export class Enemy {
+  constructor(x,y){
+    this.x = x;
+    this.y = y;
 
-  init(w,h,mainCtx){
-    this.ctx = mainCtx;
-    this.bg = new OffscreenCanvas(w,h);
-    this.ink = new OffscreenCanvas(w,h);
-    this.fx = new OffscreenCanvas(w,h);
-  },
+    this.w = 40;
+    this.h = 60;
 
-  clear(){
-    [this.bg,this.ink,this.fx].forEach(c=>{
-      const x=c.getContext("2d");
-      x.clearRect(0,0,c.width,c.height);
-    });
-  },
+    this.speed = 100;
 
-  compose(){
-    this.ctx.clearRect(0,0,360,640);
-    this.ctx.drawImage(this.bg,0,0);
-    this.ctx.drawImage(this.ink,0,0);
-    this.ctx.drawImage(this.fx,0,0);
+    this.hp = 50;
+    this.alive = true;
+
+    this.damage = 10;
   }
-};
+
+  update(dt, player){
+    if(!this.alive) return;
+
+    // 플레이어 추적
+    if(player.x < this.x){
+      this.x -= this.speed * dt;
+    }else{
+      this.x += this.speed * dt;
+    }
+
+    if(this.hp <= 0){
+      this.alive = false;
+    }
+  }
+
+  draw(ctx){
+    if(!this.alive) return;
+
+    ctx.fillStyle = "gray";
+    ctx.fillRect(this.x,this.y,this.w,this.h);
+  }
+
+  takeDamage(dmg){
+    this.hp -= dmg;
+  }
+
+  getHitbox(){
+    return {
+      x:this.x,
+      y:this.y,
+      w:this.w,
+      h:this.h
+    };
+  }
+}
