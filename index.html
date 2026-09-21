@@ -6,47 +6,36 @@
   <title>Ink Sword - 수묵검객</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
-  <!-- PWA 홈 화면 추가 및 전체화면 지원 메타 -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
   <div id="app-container">
-    <div id="auth-status">오프라인 모드 (로컬 저장 중)</div>
+    <div id="auth-status">오프라인 모드 (로컬 저장)</div>
     
     <div class="ink-ui-panel">
-      <button id="google-login-btn" class="ink-btn">구글 계정 연동</button>
+      <button id="google-login-btn" class="ink-btn">구글 로그인</button>
       <button id="fullscreen-btn" class="ink-btn">전체화면</button>
     </div>
 
-    <!-- 게임 캔버스 영역 -->
-    <canvas id="gameCanvas"></canvas>
+    <!-- 게임 화면용 캔버스 (오리지널 비율 유지) -->
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
   </div>
 
-  <!-- 메인 게임 스크립트 로드 (ES 모듈 구조) -->
   <script type="module" src="main.js"></script>
 
   <script>
-    // 서비스 워커 등록 (PWA 핵심)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('Service Worker 등록 성공:', reg.scope))
-          .catch(err => console.error('Service Worker 등록 실패:', err));
+        navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
       });
     }
 
-    // 전체화면 토글 기능
     document.getElementById('fullscreen-btn').addEventListener('click', () => {
       if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => {
-          console.error("전체화면 전환 에러:", err);
-        });
+        document.documentElement.requestFullscreen().catch(() => {});
       } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
+        document.exitFullscreen?.();
       }
     });
   </script>
