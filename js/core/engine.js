@@ -19,7 +19,6 @@ export class Engine {
     this.lastTime = 0;
     this.isRunning = false;
 
-    // 컴포넌트 초기화
     this.skyline = new SkylineEffect(this.ctx, this.width, this.height);
     this.brush = new BrushEffect(this.ctx);
     this.ink = new InkEffect(this.ctx);
@@ -34,9 +33,7 @@ export class Engine {
 
   init() {
     StorageManager.load();
-    console.log("Ink Sword 엔진 및 시스템 정상 부팅 완료");
-    
-    // 초기 적 스폰 테스트
+    console.log("한지 테마 수묵 게임 엔진 가동");
     this.enemies.push(new Enemy(this.ctx, this.width - 300, this.height - 250));
   }
 
@@ -49,7 +46,6 @@ export class Engine {
 
   loop(currentTime) {
     if (!this.isRunning) return;
-
     const dt = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
 
@@ -66,34 +62,28 @@ export class Engine {
     this.brush.update(dt);
     this.ink.update(dt);
     this.player.update(dt);
-
-    this.enemies.forEach(enemy => enemy.update(dt));
+    this.enemies.forEach(e => e.update(dt));
     if (this.boss) this.boss.update(dt);
-
-    this.stageSystem.update(dt);
-    this.chapterSystem.update(dt);
   }
 
   render() {
-    // 수묵화풍 배경 클리어
-    this.ctx.fillStyle = "#111111";
+    // 캔버스 전체를 따뜻한 한지 색상으로 깔끔하게 채우기
+    this.ctx.fillStyle = "#f7f4eb";
     this.ctx.fillRect(0, 0, this.width, this.height);
 
-    // 배경 및 이펙트 렌더링
+    // 수묵 배경 및 오브젝트 렌더링
     this.skyline.render();
     this.brush.render();
     this.ink.render();
-
-    // 게임 엔티티 렌더링
     this.player.render();
-    this.enemies.forEach(enemy => enemy.render());
+    this.enemies.forEach(e => e.render());
     if (this.boss) this.boss.render();
 
-    // 상단 UI HUD 렌더링
-    this.ctx.fillStyle = "#ffffff";
-    this.ctx.font = "18px 'Noto Serif KR', serif";
-    this.ctx.fillText(`점수: ${GameState.score}`, 40, 50);
-    this.ctx.fillText(`장(Chapter): ${GameState.chapter} - 스테이지 ${GameState.stage}`, 40, 80);
-    this.ctx.fillText(`체력: ${GameState.health}`, 40, 110);
+    // 상단 UI 텍스트 (가시성이 높은 진한 먹색 폰트)
+    this.ctx.fillStyle = "#1c1917";
+    this.ctx.font = "bold 20px 'Noto Serif KR', serif";
+    this.ctx.fillText(`처치 점수: ${GameState.score}`, 40, 50);
+    this.ctx.fillText(`장(Chapter): ${GameState.chapter} - 제 ${GameState.stage} 스테이지`, 40, 85);
+    this.ctx.fillText(`체력: ${GameState.health}`, 40, 120);
   }
 }
