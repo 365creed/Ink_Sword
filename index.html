@@ -11,26 +11,29 @@
 </head>
 <body>
   <div id="app-container">
-    <div id="auth-status">오프라인 모드 (로컬 저장)</div>
+    <div id="auth-status">오프라인 모드 (로컬 세이브 활성화)</div>
     
     <div class="ink-ui-panel">
       <button id="google-login-btn" class="ink-btn">구글 로그인</button>
       <button id="fullscreen-btn" class="ink-btn">전체화면</button>
     </div>
 
-    <!-- 게임 화면용 캔버스 (오리지널 비율 유지) -->
+    <!-- 게임 렌더링 캔버스 (16:9 비율 고정) -->
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
   </div>
 
+  <!-- 메인 게임 진입점 (ES 모듈) -->
   <script type="module" src="main.js"></script>
 
   <script>
+    // PWA 서비스 워커 등록 (인터넷 차단 오프라인 지원)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
+        navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW 등록 실패:', err));
       });
     }
 
+    // 전체화면 토글
     document.getElementById('fullscreen-btn').addEventListener('click', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
