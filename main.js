@@ -3,13 +3,10 @@ import { StorageManager } from './js/core/storage.js';
 import { AuthSystem } from './js/systems/auth.js';
 
 window.addEventListener('DOMContentLoaded', () => {
-  console.log("Ink Sword 시스템 부팅 중...");
+  // 데이터 로드
+  window.gameSaveData = StorageManager.load();
 
-  // 1. 저장 데이터 로드
-  const savedData = StorageManager.load();
-  window.gameSaveData = savedData;
-
-  // 2. 인증 시스템 초기화
+  // 구글 로그인 핸들러 연동
   AuthSystem.init((user) => {
     const statusEl = document.getElementById('auth-status');
     if (user) {
@@ -17,14 +14,13 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 3. 게임 엔진 초기화 및 실행
+  // 캔버스 및 엔진 부팅
   const canvas = document.getElementById('gameCanvas');
-  const engine = new Engine(canvas);
-  engine.init();
-  engine.start();
-
-  // 자동 세이브 예시 (주기적 혹은 스테이지 클리어 시)
-  window.addEventListener('beforeunload', () => {
-    StorageManager.save(window.gameSaveData);
-  });
+  if (canvas) {
+    const engine = new Engine(canvas);
+    engine.init();
+    engine.start();
+  } else {
+    console.error("게임 캔버스를 찾을 수 없습니다.");
+  }
 });
