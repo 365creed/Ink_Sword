@@ -1,60 +1,54 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Ink Vengeance</title>
-
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ink Sword - 수묵검객</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <!-- PWA 홈 화면 추가 및 전체화면 지원 메타 -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
-
-  <!-- =============================
-       GAME CANVAS LAYER
-  ============================== -->
-  <canvas id="game"></canvas>
-
-  <!-- =============================
-       HUD LAYER
-  ============================== -->
-  <div id="hud">
-    <div id="chapterLabel">PROLOGUE</div>
-    <div id="hpBar">
-      <div id="hpFill"></div>
+  <div id="app-container">
+    <div id="auth-status">오프라인 모드 (로컬 저장 중)</div>
+    
+    <div class="ink-ui-panel">
+      <button id="google-login-btn" class="ink-btn">구글 계정 연동</button>
+      <button id="fullscreen-btn" class="ink-btn">전체화면</button>
     </div>
+
+    <!-- 게임 캔버스 영역 -->
+    <canvas id="gameCanvas"></canvas>
   </div>
 
-  <!-- =============================
-       STORY LAYER
-  ============================== -->
-  <div id="storyLayer" class="hidden">
-    <div id="storyBox">
-      <div id="storyText"></div>
-      <button id="storyNext">다음</button>
-    </div>
-  </div>
+  <!-- 메인 게임 스크립트 로드 (ES 모듈 구조) -->
+  <script type="module" src="main.js"></script>
 
-  <!-- =============================
-       MOBILE CONTROL LAYER
-  ============================== -->
-  <div id="controlLayer">
+  <script>
+    // 서비스 워커 등록 (PWA 핵심)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Service Worker 등록 성공:', reg.scope))
+          .catch(err => console.error('Service Worker 등록 실패:', err));
+      });
+    }
 
-    <div id="joystick">
-      <div id="stick"></div>
-    </div>
-
-    <div id="actionButtons">
-      <button id="attackBtn">⚔</button>
-      <button id="guardBtn">⛨</button>
-    </div>
-
-  </div>
-
-  <!-- =============================
-       SCRIPT
-  ============================== -->
-  <script src="main.js"></script>
-
+    // 전체화면 토글 기능
+    document.getElementById('fullscreen-btn').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.error("전체화면 전환 에러:", err);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    });
+  </script>
 </body>
 </html>
