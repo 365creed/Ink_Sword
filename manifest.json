@@ -4,8 +4,8 @@
   "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "landscape",
-  "background_color": "#1a1a1a",
-  "theme_color": "#2c2c2c",
+  "background_color": "#111111",
+  "theme_color": "#111111",
   "icons": [
     {
       "src": "assets/images/player.png",
