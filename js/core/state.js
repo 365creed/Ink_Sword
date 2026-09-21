@@ -1,17 +1,17 @@
-let current = null;
+export const GameState = {
+  score: 0,
+  stage: 1,
+  chapter: 1,
+  health: 100,
+  isGameOver: false,
+  isPaused: false,
 
-export function setScene(scene){
-  current = scene;
-}
-
-export function resizeScene(w,h){
-  if(current && current.resize) current.resize(w,h);
-}
-
-export function updateScene(){
-  if(current && current.update) current.update();
-}
-
-export function drawScene(ctx){
-  if(current && current.draw) current.draw(ctx);
-}
+  reset() {
+    this.score = 0;
+    this.stage = 1;
+    this.chapter = 1;
+    this.health = 100;
+    this.isGameOver = false;
+    this.isPaused = false;
+  }
+};
