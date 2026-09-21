@@ -1,26 +1,31 @@
 import { Engine } from './js/core/engine.js';
 import { StorageManager } from './js/core/storage.js';
-import { AuthSystem } from './js/systems/auth.js';
 
 window.addEventListener('DOMContentLoaded', () => {
-  // 데이터 로드
-  window.gameSaveData = StorageManager.load();
-
-  // 구글 로그인 핸들러 연동
-  AuthSystem.init((user) => {
-    const statusEl = document.getElementById('auth-status');
-    if (user) {
-      statusEl.innerText = `${user.displayName} 계정 연동됨`;
-    }
-  });
-
-  // 캔버스 및 엔진 부팅
   const canvas = document.getElementById('gameCanvas');
+  
   if (canvas) {
+    // 게임 엔진 생성 및 구동
     const engine = new Engine(canvas);
     engine.init();
     engine.start();
   } else {
-    console.error("게임 캔버스를 찾을 수 없습니다.");
+    console.error("게임 구동 실패: 캔버스 요소를 찾을 수 없습니다.");
   }
+
+  // 구글 로그인 버튼 이벤트 바인딩
+  const loginBtn = document.getElementById('google-login-btn');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+      console.log("구글 로그인 시도...");
+      // 가상 계정 연동 성공 테스트
+      window.currentUser = { uid: "user_ink_99", displayName: "수묵검객" };
+      document.getElementById('auth-status').innerText = `${window.currentUser.displayName} 계정 연동됨`;
+    });
+  }
+
+  // 페이지 종료 시 자동 세이브
+  window.addEventListener('beforeunload', () => {
+    StorageManager.save();
+  });
 });
