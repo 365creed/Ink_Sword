@@ -9,7 +9,7 @@ window.addEventListener('DOMContentLoaded', () => {
     engine.start();
   }
 
-  // 자동 세이브 트리거
+  // 10초 주기 자동 저장
   setInterval(() => {
     StorageManager.save();
   }, 10000);
