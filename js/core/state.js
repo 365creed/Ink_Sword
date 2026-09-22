@@ -3,6 +3,7 @@ export const GameState = {
   stage: 1,
   chapter: 1,
   health: 100,
+  maxHealth: 100,
   isGameOver: false,
   isPaused: false,
 
