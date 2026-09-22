@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ink-sword-v6-combat';
+const CACHE_NAME = 'ink-sword-v7-complete';
 const ASSETS = [
   './index.html',
   './style.css',
