@@ -1,24 +1,29 @@
 export const GameState = {
-  // 전투 수치
+  // 모드: 'TITLE', 'PROLOGUE', 'TUTORIAL', 'STAGE_INTRO', 'PLAYING', 'STAGE_RESULT', 'GAME_OVER'
+  mode: 'TITLE',
+
+  // 영구 진행 데이터
+  chapter: 1,      // 1: 강서(江西), 2: 강북(江北)
+  stage: 1,        // 1, 2, 3(보스)
+  tutorialCompleted: false,
+  bestRanks: {},
+
+  // 스테이지 전투 실시간 수치
   hp: 100,
   maxHp: 100,
-  ink: 60,       // 먹 게이지 (0 ~ 100)
+  ink: 60,
   maxInk: 100,
-  
-  // 콤보 및 랭크 통계
+
   combo: 0,
   maxCombo: 0,
-  score: 0,
   kills: 0,
   parries: 0,
   hitsTaken: 0,
-  startTime: 0,
+  stageStartTime: 0,
+  clearTimeStr: "00:00",
 
-  // 진행 상태
-  chapter: 1,    // 제1장 강서(江西)
-  stage: 1,
-  isGameOver: false,
-  isVictory: false,
+  // 튜토리얼 내부 스텝 (0:참, 1:파, 2:신, 3:반, 4:묵)
+  tutorialStep: 0,
 
   addCombo() {
     this.combo++;
@@ -41,7 +46,8 @@ export const GameState = {
     return false;
   },
 
-  reset() {
+  // 스테이지 진입 시 전투 상태만 초기화 (진행도는 유지!)
+  resetForStage() {
     this.hp = this.maxHp;
     this.ink = 60;
     this.combo = 0;
@@ -49,9 +55,6 @@ export const GameState = {
     this.kills = 0;
     this.parries = 0;
     this.hitsTaken = 0;
-    this.score = 0;
-    this.isGameOver = false;
-    this.isVictory = false;
-    this.startTime = Date.now();
+    this.stageStartTime = Date.now();
   }
 };
