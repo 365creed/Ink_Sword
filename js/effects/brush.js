@@ -1,39 +1,50 @@
 export class BrushEffect {
   constructor(ctx) {
     this.ctx = ctx;
-    this.strokes = [];
+    this.slashes = [];
   }
 
-  addSlash(x, y, facing) {
-    this.strokes.push({
-      x, y, facing,
-      life: 0.25,
-      maxLife: 0.25
+  addSlash(x, y, facing, type = 'normal') {
+    this.slashes.push({
+      x, y, facing, type,
+      life: type === 'heavy' ? 0.3 : 0.2,
+      maxLife: type === 'heavy' ? 0.3 : 0.2
     });
   }
 
   update(dt) {
-    for (let i = this.strokes.length - 1; i >= 0; i--) {
-      this.strokes[i].life -= dt;
-      if (this.strokes[i].life <= 0) {
-        this.strokes.splice(i, 1);
-      }
+    for (let i = this.slashes.length - 1; i >= 0; i--) {
+      this.slashes[i].life -= dt;
+      if (this.slashes[i].life <= 0) this.slashes.splice(i, 1);
     }
   }
 
   render() {
-    this.ctx.save();
-    for (const s of this.strokes) {
+    const ctx = this.ctx;
+    ctx.save();
+    for (const s of this.slashes) {
       const alpha = s.life / s.maxLife;
-      this.ctx.strokeStyle = `rgba(20, 18, 15, ${alpha * 0.9})`;
-      this.ctx.lineWidth = 8;
-      this.ctx.lineCap = 'round';
-      this.ctx.beginPath();
-      const startAngle = s.facing > 0 ? -Math.PI * 0.4 : Math.PI * 0.6;
-      const endAngle = s.facing > 0 ? Math.PI * 0.4 : Math.PI * 1.4;
-      this.ctx.arc(s.x, s.y, 75, startAngle, endAngle);
-      this.ctx.stroke();
+      if (s.type === 'heavy') {
+        // 강공격 '破' - 묵직한 짙은 붓선
+        ctx.strokeStyle = `rgba(18, 15, 12, ${alpha * 0.95})`;
+        ctx.lineWidth = 14;
+      } else if (s.type === 'parry') {
+        // 패링 '返' - 금빛 도는 강한 섬광
+        ctx.strokeStyle = `rgba(180, 140, 40, ${alpha})`;
+        ctx.lineWidth = 10;
+      } else {
+        // 기본검격 '斬'
+        ctx.strokeStyle = `rgba(32, 28, 23, ${alpha * 0.9})`;
+        ctx.lineWidth = 7;
+      }
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      const radius = s.type === 'heavy' ? 110 : 80;
+      const start = s.facing > 0 ? -Math.PI * 0.45 : Math.PI * 0.55;
+      const end = s.facing > 0 ? Math.PI * 0.45 : Math.PI * 1.45;
+      ctx.arc(s.x, s.y, radius, start, end);
+      ctx.stroke();
     }
-    this.ctx.restore();
+    ctx.restore();
   }
 }
