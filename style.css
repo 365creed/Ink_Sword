@@ -7,10 +7,9 @@
 body, html {
   width: 100%;
   height: 100%;
-  background-color: #ded8cb;
+  background-color: #dcd6c8;
   color: #24201b;
-  /* 저작권 프리 OS 기본 한글 명조/바탕 서체 스택 */
-  font-family: 'Noto Serif KR', 'Batang', 'AppleMyungjo', 'Song Myung', serif;
+  font-family: 'Noto Serif KR', 'Batang', 'AppleMyungjo', 'Gungsuh', serif;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -23,7 +22,7 @@ body, html {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(circle, #f3efe6 0%, #cfc8b8 100%);
+  background: radial-gradient(circle, #f5f2e8 0%, #cdc5b3 100%);
 }
 
 canvas {
@@ -31,13 +30,13 @@ canvas {
   max-width: 1280px;
   height: auto;
   aspect-ratio: 16 / 9;
-  box-shadow: 0 12px 45px rgba(25, 20, 15, 0.3);
+  box-shadow: 0 14px 45px rgba(25, 20, 15, 0.35);
   border: 2px solid #332d25;
   background-color: #f7f4eb;
   touch-action: none;
 }
 
-/* 상단 정보 패널 */
+/* 상단 유틸리티 */
 .top-nav {
   position: absolute;
   top: 15px;
@@ -66,7 +65,7 @@ canvas {
   color: #f7f4eb;
 }
 
-/* 모바일 가상 패드 */
+/* 모바일 수묵 낙관(落款) 도장풍 조작 패드 */
 .mobile-controls {
   display: none;
   position: absolute;
@@ -86,20 +85,35 @@ canvas {
   display: flex;
   gap: 12px;
   pointer-events: auto;
+  align-items: flex-end;
 }
 
-.touch-btn {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: rgba(36, 32, 27, 0.82);
+/* 동양화 도장 형태의 버튼 */
+.stamp-btn {
+  width: 54px;
+  height: 54px;
+  background: #8b2522; /* 붉은 인주 색상 */
   color: #f7f4eb;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: bold;
-  border: 2px solid #7d7262;
+  border: 2px solid #541412;
+  border-radius: 4px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+
+.stamp-btn.sub {
+  background: #2c2722; /* 먹색 인장 */
+  border-color: #15120f;
+}
+
+.stamp-btn span.cost {
+  font-size: 9px;
+  font-weight: normal;
+  opacity: 0.85;
 }
