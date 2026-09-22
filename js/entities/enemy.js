@@ -1,51 +1,43 @@
 export class Enemy {
-  constructor(x,y){
+  constructor(ctx, x, y) {
+    this.ctx = ctx;
     this.x = x;
     this.y = y;
-
-    this.w = 40;
-    this.h = 60;
-
-    this.speed = 100;
-
+    this.width = 55;
+    this.height = 85;
     this.hp = 50;
-    this.alive = true;
-
-    this.damage = 10;
+    this.isDead = false;
+    this.speed = 100;
   }
 
-  update(dt, player){
-    if(!this.alive) return;
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.isDead = true;
+    }
+  }
 
-    // 플레이어 추적
-    if(player.x < this.x){
+  update(dt, playerX) {
+    if (this.isDead) return;
+    // 플레이어를 향해 천천히 전진
+    if (this.x > playerX + 60) {
       this.x -= this.speed * dt;
-    }else{
+    } else if (this.x < playerX - 60) {
       this.x += this.speed * dt;
     }
-
-    if(this.hp <= 0){
-      this.alive = false;
-    }
   }
 
-  draw(ctx){
-    if(!this.alive) return;
+  render() {
+    if (this.isDead) return;
+    this.ctx.save();
+    // 짙은 먹색의 그림자 자객 실루엣
+    this.ctx.fillStyle = "rgba(40, 35, 30, 0.9)";
+    this.ctx.fillRect(this.x, this.y, this.width, this.height);
 
-    ctx.fillStyle = "gray";
-    ctx.fillRect(this.x,this.y,this.w,this.h);
-  }
-
-  takeDamage(dmg){
-    this.hp -= dmg;
-  }
-
-  getHitbox(){
-    return {
-      x:this.x,
-      y:this.y,
-      w:this.w,
-      h:this.h
-    };
+    // 붉은 안광
+    this.ctx.fillStyle = "#8a1a1a";
+    this.ctx.fillRect(this.x + 12, this.y + 18, 6, 4);
+    this.ctx.fillRect(this.x + 24, this.y + 18, 6, 4);
+    this.ctx.restore();
   }
 }
