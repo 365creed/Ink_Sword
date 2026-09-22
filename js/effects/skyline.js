@@ -4,31 +4,40 @@ export class SkylineEffect {
     this.width = width;
     this.height = height;
   }
-  update(dt) {
-    // 배경 산수화 흐름 업데이트
-  }
+
+  update(dt) {}
+
   render() {
     this.ctx.save();
-    // 농담이 살아있는 수묵 능선 (먹물 톤)
-    this.ctx.fillStyle = "rgba(70, 65, 58, 0.15)";
+    // 1. 원경 안개산 (먹 농담)
+    this.ctx.fillStyle = "rgba(65, 60, 52, 0.12)";
     this.ctx.beginPath();
     this.ctx.moveTo(0, this.height);
-    this.ctx.lineTo(0, this.height - 220);
-    this.ctx.quadraticCurveTo(this.width / 3, this.height - 380, this.width * 0.7, this.height - 200);
-    this.ctx.lineTo(this.width, this.height - 260);
+    this.ctx.lineTo(0, this.height - 280);
+    this.ctx.quadraticCurveTo(this.width * 0.25, this.height - 440, this.width * 0.55, this.height - 260);
+    this.ctx.quadraticCurveTo(this.width * 0.8, this.height - 380, this.width, this.height - 230);
     this.ctx.lineTo(this.width, this.height);
     this.ctx.closePath();
     this.ctx.fill();
 
-    // 전경 능선
-    this.ctx.fillStyle = "rgba(40, 37, 33, 0.3)";
+    // 2. 근경 산 능선
+    this.ctx.fillStyle = "rgba(35, 32, 28, 0.25)";
     this.ctx.beginPath();
     this.ctx.moveTo(0, this.height);
-    this.ctx.lineTo(0, this.height - 120);
-    this.ctx.quadraticCurveTo(this.width / 2, this.height - 220, this.width, this.height - 140);
+    this.ctx.lineTo(0, this.height - 150);
+    this.ctx.quadraticCurveTo(this.width * 0.4, this.height - 250, this.width * 0.75, this.height - 130);
+    this.ctx.lineTo(this.width, this.height - 180);
     this.ctx.lineTo(this.width, this.height);
     this.ctx.closePath();
     this.ctx.fill();
+
+    // 3. 지면 바닥선
+    this.ctx.strokeStyle = "#2e2922";
+    this.ctx.lineWidth = 4;
+    this.ctx.beginPath();
+    this.ctx.moveTo(0, this.height - 100);
+    this.ctx.lineTo(this.width, this.height - 100);
+    this.ctx.stroke();
 
     this.ctx.restore();
   }
