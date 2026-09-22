@@ -1,38 +1,32 @@
-const CACHE_NAME = 'ink-sword-v5-clean';
+const CACHE_NAME = 'ink-sword-v6-combat';
 const ASSETS = [
   './index.html',
   './style.css',
   './main.js',
   './manifest.json',
-  './js/core/engine.js',
+  './js/core/sound.js',
   './js/core/state.js',
   './js/core/storage.js',
+  './js/core/engine.js',
+  './js/effects/skyline.js',
   './js/effects/brush.js',
   './js/effects/ink.js',
-  './js/effects/skyline.js',
   './js/entities/player.js',
   './js/entities/enemy.js',
   './js/entities/boss.js',
-  './js/systems/auth.js',
   './js/systems/stage.js',
-  './js/systems/chapter.js',
-  './js/systems/story.js',
   './assets/images/player.png'
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
+  e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.map((key) => {
-        if (key !== CACHE_NAME) return caches.delete(key);
-      })
+      keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null))
     ))
   );
   self.clients.claim();
@@ -40,6 +34,6 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request).catch(() => caches.match('./index.html')))
+    caches.match(e.request).then((res) => res || fetch(e.request).catch(() => caches.match('./index.html')))
   );
 });
