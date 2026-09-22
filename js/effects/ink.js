@@ -4,18 +4,18 @@ export class InkEffect {
     this.particles = [];
   }
 
-  createSplash(x, y, count = 12) {
+  splash(x, y, count = 14, color = "rgba(28, 24, 20, ") {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 150 + 50;
+      const speed = Math.random() * 260 + 60;
       this.particles.push({
-        x: x,
-        y: y,
+        x, y,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        radius: Math.random() * 6 + 3,
-        alpha: 0.85,
-        life: 0.6
+        vy: Math.sin(angle) * speed - 60,
+        r: Math.random() * 6 + 2,
+        color,
+        life: 0.55,
+        maxLife: 0.55
       });
     }
   }
@@ -25,22 +25,22 @@ export class InkEffect {
       const p = this.particles[i];
       p.x += p.vx * dt;
       p.y += p.vy * dt;
+      p.vy += 450 * dt; // 중력
       p.life -= dt;
-      p.alpha = Math.max(0, p.life / 0.6);
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
-      }
+      if (p.life <= 0) this.particles.splice(i, 1);
     }
   }
 
   render() {
-    this.ctx.save();
+    const ctx = this.ctx;
+    ctx.save();
     for (const p of this.particles) {
-      this.ctx.fillStyle = `rgba(30, 27, 24, ${p.alpha})`;
-      this.ctx.beginPath();
-      this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      this.ctx.fill();
+      const alpha = p.life / p.maxLife;
+      ctx.fillStyle = `${p.color}${alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
     }
-    this.ctx.restore();
+    ctx.restore();
   }
 }
