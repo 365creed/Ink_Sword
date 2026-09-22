@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ink Sword - 수묵검객</title>
+  <title>묵검 (墨劍) - 수묵 액션</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <meta name="mobile-web-app-capable" content="yes">
@@ -11,38 +11,36 @@
 </head>
 <body>
   <div id="app-container">
-    <div id="auth-status">오프라인 모드 (로컬 저장 활성화)</div>
-    
-    <div class="ink-ui-panel">
-      <button id="google-login-btn" class="ink-btn">구글 계정 연동</button>
+    <div class="top-nav">
+      <button id="save-status-btn" class="ink-btn">기기 로컬 저장됨</button>
       <button id="fullscreen-btn" class="ink-btn">전체화면</button>
     </div>
 
-    <!-- 1280x720 규격 캔버스 -->
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
 
-    <!-- 모바일 터치 지원 조작 버튼 -->
+    <!-- 모바일 가상 조작 버튼 -->
     <div class="mobile-controls">
-      <div class="touch-btn-group">
-        <button id="btn-left" class="touch-btn">◀</button>
-        <button id="btn-right" class="touch-btn">▶</button>
+      <div class="touch-group">
+        <button id="m-left" class="touch-btn">◀</button>
+        <button id="m-right" class="touch-btn">▶</button>
       </div>
-      <div class="touch-btn-group">
-        <button id="btn-jump" class="touch-btn">도약</button>
-        <button id="btn-attack" class="touch-btn">검격</button>
+      <div class="touch-group">
+        <button id="m-dash" class="touch-btn">迅(대시)</button>
+        <button id="m-parry" class="touch-btn">返(패링)</button>
+        <button id="m-jump" class="touch-btn">도약</button>
+        <button id="m-atk" class="touch-btn">斬(공격)</button>
+        <button id="m-sp" class="touch-btn">墨(필살)</button>
       </div>
     </div>
   </div>
 
   <script type="module" src="main.js"></script>
-
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(() => {});
       });
     }
-
     document.getElementById('fullscreen-btn').addEventListener('click', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
