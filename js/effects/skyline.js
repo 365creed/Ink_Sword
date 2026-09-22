@@ -3,42 +3,51 @@ export class SkylineEffect {
     this.ctx = ctx;
     this.width = width;
     this.height = height;
+    this.offset = 0;
   }
 
-  update(dt) {}
+  update(dt, playerVx) {
+    this.offset += playerVx * dt * 0.15;
+  }
 
   render() {
-    this.ctx.save();
-    // 1. 원경 안개산 (먹 농담)
-    this.ctx.fillStyle = "rgba(65, 60, 52, 0.12)";
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, this.height);
-    this.ctx.lineTo(0, this.height - 280);
-    this.ctx.quadraticCurveTo(this.width * 0.25, this.height - 440, this.width * 0.55, this.height - 260);
-    this.ctx.quadraticCurveTo(this.width * 0.8, this.height - 380, this.width, this.height - 230);
-    this.ctx.lineTo(this.width, this.height);
-    this.ctx.closePath();
-    this.ctx.fill();
+    const ctx = this.ctx;
+    ctx.save();
 
-    // 2. 근경 산 능선
-    this.ctx.fillStyle = "rgba(35, 32, 28, 0.25)";
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, this.height);
-    this.ctx.lineTo(0, this.height - 150);
-    this.ctx.quadraticCurveTo(this.width * 0.4, this.height - 250, this.width * 0.75, this.height - 130);
-    this.ctx.lineTo(this.width, this.height - 180);
-    this.ctx.lineTo(this.width, this.height);
-    this.ctx.closePath();
-    this.ctx.fill();
+    // 1. 하늘의 은은한 먹구름 안개
+    ctx.fillStyle = "rgba(180, 172, 156, 0.15)";
+    ctx.fillRect(0, 0, this.width, 240);
 
-    // 3. 지면 바닥선
-    this.ctx.strokeStyle = "#2e2922";
-    this.ctx.lineWidth = 4;
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, this.height - 100);
-    this.ctx.lineTo(this.width, this.height - 100);
-    this.ctx.stroke();
+    // 2. 원경: 북한산/인왕산 능선 실루엣 (연한 담묵)
+    ctx.fillStyle = "rgba(75, 68, 58, 0.12)";
+    ctx.beginPath();
+    ctx.moveTo(0, this.height);
+    ctx.lineTo(0, this.height - 320);
+    ctx.quadraticCurveTo(this.width * 0.3 - (this.offset * 0.2) % 300, this.height - 480, this.width * 0.6, this.height - 290);
+    ctx.quadraticCurveTo(this.width * 0.85, this.height - 410, this.width, this.height - 260);
+    ctx.lineTo(this.width, this.height);
+    ctx.closePath();
+    ctx.fill();
 
-    this.ctx.restore();
+    // 3. 중경: 강서 갈대 언덕 및 한양 성곽 실루엣 (농묵)
+    ctx.fillStyle = "rgba(42, 38, 32, 0.25)";
+    ctx.beginPath();
+    ctx.moveTo(0, this.height);
+    ctx.lineTo(0, this.height - 180);
+    ctx.quadraticCurveTo(this.width * 0.45 - (this.offset * 0.5) % 400, this.height - 270, this.width * 0.8, this.height - 150);
+    ctx.lineTo(this.width, this.height - 200);
+    ctx.lineTo(this.width, this.height);
+    ctx.closePath();
+    ctx.fill();
+
+    // 4. 지면: 거친 붓으로 그은 대지선 (y = 620)
+    ctx.strokeStyle = "#2b251e";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0, 620);
+    ctx.lineTo(this.width, 620);
+    ctx.stroke();
+
+    ctx.restore();
   }
 }
