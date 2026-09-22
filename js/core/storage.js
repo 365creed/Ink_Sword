@@ -1,14 +1,15 @@
 import { GameState } from './state.js';
 
 export const StorageManager = {
-  KEY: 'ink_sword_master_save',
+  KEY: 'ink_sword_master_save_v7',
 
   save() {
     try {
       const data = {
         chapter: GameState.chapter,
         stage: GameState.stage,
-        score: GameState.score,
+        tutorialCompleted: GameState.tutorialCompleted,
+        bestRanks: GameState.bestRanks,
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(this.KEY, JSON.stringify(data));
@@ -24,7 +25,8 @@ export const StorageManager = {
         const d = JSON.parse(raw);
         GameState.chapter = d.chapter || 1;
         GameState.stage = d.stage || 1;
-        GameState.score = d.score || 0;
+        GameState.tutorialCompleted = !!d.tutorialCompleted;
+        GameState.bestRanks = d.bestRanks || {};
         return d;
       }
     } catch (e) {
