@@ -7,16 +7,22 @@ export class Player {
     this.x = x;
     this.y = y;
 
-    // 382:287 원본 비율 엄수 렌더링
-    this.renderH = 112;
-    this.renderW = 112 * (382 / 287);
+    // 히트박스(AABB) - 절대 변형되지 않는 논리적 사각형
     this.hitW = 54;
     this.hitH = 96;
+    this.renderH = 112;
+    this.renderW = 112 * (382 / 287);
 
     this.vx = 0;
     this.vy = 0;
     this.facing = 1;
     this.isGrounded = true;
+
+    // 2.5D 절차적 탄성 변수
+    this.scaleX = 1.0;
+    this.scaleY = 1.0;
+    this.tilt = 0;
+    this.runAnimTimer = 0;
 
     this.state = 'idle'; // idle, run, attack, heavy, dash, parry, hurt
     this.stateTimer = 0;
@@ -31,73 +37,86 @@ export class Player {
   attack(brush, ink, enemies, boss) {
     if (this.state === 'dash' || this.state === 'parry') return;
     this.state = 'attack';
-    this.stateTimer = 0.2;
+    this.stateTimer = 0.22;
     this.sound.playSlash();
 
-    const atkX = this.x + (this.facing > 0 ? this.hitW + 30 : -30);
+    // 공격 시 전신 찌르기 탄성 (앞으로 쏠림)
+    this.tilt = this.facing * 0.18;
+    this.scaleX = 1.25;
+    this.scaleY = 0.85;
+
+    const atkX = this.x + (this.facing > 0 ? this.hitW + 35 : -35);
     const atkY = this.y + this.hitH / 2;
     brush.addSlash(atkX, atkY, this.facing, 'normal');
-    this.checkHit(atkX, atkY, 90, 28, ink, enemies, boss, false);
+    this.checkHit(atkX, atkY, 95, 28, ink, enemies, boss, false);
   }
 
   heavyAttack(brush, ink, enemies, boss) {
     if (this.state === 'dash') return;
-    if (!GameState.useInk(20)) return; // 墨 20 소모
+    if (!GameState.useInk(20)) return;
     this.state = 'heavy';
-    this.stateTimer = 0.32;
+    this.stateTimer = 0.35;
     this.sound.playHeavySlash();
 
-    const atkX = this.x + (this.facing > 0 ? this.hitW + 45 : -45);
+    this.tilt = this.facing * 0.28;
+    this.scaleX = 1.35;
+    this.scaleY = 0.75;
+
+    const atkX = this.x + (this.facing > 0 ? this.hitW + 55 : -55);
     const atkY = this.y + this.hitH / 2;
     brush.addSlash(atkX, atkY, this.facing, 'heavy');
-    this.checkHit(atkX, atkY, 130, 65, ink, enemies, boss, true);
+    this.checkHit(atkX, atkY, 140, 65, ink, enemies, boss, true);
   }
 
   dash() {
     if (this.state === 'dash') return;
-    if (!GameState.useInk(15)) return; // 墨 15 소모
+    if (!GameState.useInk(15)) return;
     this.state = 'dash';
     this.stateTimer = 0.22;
     this.sound.playDash();
-    this.vx = this.facing * 800;
+    this.vx = this.facing * 850;
 
-    // 먹물 잔상 기록
-    this.dashGhosts.push({ x: this.x, y: this.y, facing: this.facing, alpha: 0.7 });
+    this.scaleX = 1.4;
+    this.scaleY = 0.7;
+    this.dashGhosts.push({ x: this.x, y: this.y, facing: this.facing, alpha: 0.75 });
   }
 
   parry() {
     if (this.state === 'dash' || this.state === 'parry') return;
     this.state = 'parry';
-    this.stateTimer = 0.25; // 0.25초 패링 유효 시간
+    this.stateTimer = 0.25;
+    this.scaleX = 0.85;
+    this.scaleY = 1.2; // 검을 꼿꼿이 세우며 긴장 상태
   }
 
   takeDamage(amount, ink, engine) {
     if (this.state === 'dash') return 'dodged';
 
     if (this.state === 'parry') {
-      // 패링 완벽 성공!
       GameState.parries++;
       GameState.addInk(35);
       GameState.addCombo();
       this.sound.playParry();
       engine.triggerHitStop(0.14);
       engine.triggerShake(12, 0.22);
-      engine.triggerWhiteFlash(0.08); // 백색 여백 섬광
+      engine.triggerWhiteFlash(0.08);
       ink.parryBurst(this.x + this.hitW / 2, this.y + 45);
       this.state = 'idle';
+      this.scaleX = 1.3;
+      this.scaleY = 0.8;
       return 'parried';
     }
 
-    // 일반 피격
     GameState.hp -= amount;
     GameState.hitsTaken++;
     GameState.resetCombo();
     this.sound.playInkDrop();
     engine.triggerHitStop(0.06);
     engine.triggerShake(8, 0.18);
-    ink.splash(this.x + this.hitW / 2, this.y + 45, 14, "rgba(130, 24, 20, ");
+    ink.splash(this.x + this.hitW / 2, this.y + 45, 15, "rgba(130, 24, 20, ");
     this.state = 'hurt';
-    this.stateTimer = 0.2;
+    this.stateTimer = 0.22;
+    this.tilt = -this.facing * 0.25;
 
     if (GameState.hp <= 0) {
       GameState.hp = 0;
@@ -124,15 +143,15 @@ export class Player {
       hitCount++;
     }
 
-    if (hitCount > 0) {
-      this.sound.playInkDrop();
-    }
+    if (hitCount > 0) this.sound.playInkDrop();
   }
 
   jump() {
     if (this.isGrounded && this.state !== 'dash') {
-      this.vy = -560;
+      this.vy = -580;
       this.isGrounded = false;
+      this.scaleX = 0.8;
+      this.scaleY = 1.25; // 도약 순간 위로 늘어남
     }
   }
 
@@ -147,36 +166,68 @@ export class Player {
       if (this.stateTimer <= 0 && this.state !== 'idle') this.state = 'idle';
     }
 
+    // 이동 처리
     if (this.state !== 'dash') {
       if (input.left) {
         this.vx = -330;
         this.facing = -1;
+        this.runAnimTimer += dt * 14;
+        this.tilt = -0.08;
       } else if (input.right) {
         this.vx = 330;
         this.facing = 1;
+        this.runAnimTimer += dt * 14;
+        this.tilt = 0.08;
       } else {
         this.vx = 0;
+        this.tilt *= 0.8;
       }
     }
 
-    this.vy += 1300 * dt;
+    this.vy += 1350 * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
+    // 점프 중/하강 중 탄성
+    if (!this.isGrounded) {
+      if (this.vy < 0) {
+        this.scaleX = 0.9;
+        this.scaleY = 1.15;
+      } else {
+        this.scaleX = 1.05;
+        this.scaleY = 0.95;
+      }
+    }
+
+    // 착지 시 스쿼시
     if (this.y + this.hitH >= 620) {
+      if (!this.isGrounded) {
+        this.scaleX = 1.25;
+        this.scaleY = 0.8; // 착지 충격으로 가로 압축
+      }
       this.y = 620 - this.hitH;
       this.vy = 0;
       this.isGrounded = true;
     }
 
-    this.x = Math.max(30, Math.min(1280 - this.hitW - 30, this.x));
+    // 탄성 자연 복원 (Lerp)
+    this.scaleX += (1.0 - this.scaleX) * 0.15;
+    this.scaleY += (1.0 - this.scaleY) * 0.15;
+
+    // 월드 경계 및 결계 잠금 제한
+    let minX = Math.max(30, GameState.cameraX);
+    let maxX = GameState.worldWidth - this.hitW - 30;
+    if (GameState.activeBarrierX !== null) {
+      maxX = Math.min(maxX, GameState.activeBarrierX - this.hitW);
+    }
+    this.x = Math.max(minX, Math.min(maxX, this.x));
   }
 
   render() {
     const ctx = this.ctx;
     ctx.save();
 
-    // 1. 대시 먹물 잔상
+    // 1. 잔상 렌더링
     for (const g of this.dashGhosts) {
       ctx.fillStyle = `rgba(28, 24, 20, ${g.alpha * 0.45})`;
       ctx.beginPath();
@@ -184,28 +235,29 @@ export class Player {
       ctx.fill();
     }
 
-    // 2. 검객 본체
+    // 2. 2.5D 트랜스폼 적용 (발바닥 중심 스케일 & 틸트)
+    ctx.translate(this.x + this.hitW / 2, this.y + this.hitH);
+    ctx.rotate(this.tilt);
+    ctx.scale(this.scaleX, this.scaleY);
+
     if (this.imgLoaded) {
       ctx.save();
-      if (this.facing < 0) {
-        ctx.scale(-1, 1);
-        ctx.drawImage(this.img, -this.x - this.renderW + 28, this.y - 10, this.renderW, this.renderH);
-      } else {
-        ctx.drawImage(this.img, this.x - 28, this.y - 10, this.renderW, this.renderH);
-      }
+      if (this.facing < 0) ctx.scale(-1, 1);
+      ctx.drawImage(this.img, -this.renderW / 2, -this.renderH, this.renderW, this.renderH);
       ctx.restore();
     } else {
-      // 갓과 도포 실루엣
       ctx.fillStyle = this.state === 'hurt' ? "#7a2222" : (this.state === 'parry' ? "#443928" : "#1a1613");
+      // 갓
       ctx.beginPath();
-      ctx.ellipse(this.x + this.hitW / 2, this.y + 12, 32, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, -this.hitH + 12, 32, 8, 0, 0, Math.PI * 2);
       ctx.fill();
-
+      // 도포 (달리기 시 정현파 흔들림)
+      const sway = Math.sin(this.runAnimTimer) * 5;
       ctx.beginPath();
-      ctx.moveTo(this.x + 10, this.y + 20);
-      ctx.lineTo(this.x + this.hitW - 10, this.y + 20);
-      ctx.lineTo(this.x + this.hitW + (this.facing > 0 ? 8 : -8), this.y + this.hitH);
-      ctx.lineTo(this.x - (this.facing > 0 ? 8 : -8), this.y + this.hitH);
+      ctx.moveTo(-15, -this.hitH + 20);
+      ctx.lineTo(15, -this.hitH + 20);
+      ctx.lineTo(25 + sway, 0);
+      ctx.lineTo(-25 + sway, 0);
       ctx.closePath();
       ctx.fill();
     }
