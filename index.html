@@ -12,9 +12,9 @@
 <body>
   <div id="app-container">
     <div class="top-nav">
-     <button id="clear-cache-btn" class="ink-btn" style="color: #a82424; font-weight: bold;">캐시 비우기 & 새로고침</button>
-     <button id="save-status-btn" class="ink-btn">기기 저장됨</button>
-     <button id="fullscreen-btn" class="ink-btn">전체화면</button>
+      <button id="clear-cache-btn" class="ink-btn" style="color: #a82424; font-weight: bold;">캐시 비우기 & 새로고침</button>
+      <button id="save-status-btn" class="ink-btn">기기 저장됨</button>
+      <button id="fullscreen-btn" class="ink-btn">전체화면</button>
     </div>
 
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
@@ -36,13 +36,12 @@
     </div>
   </div>
 
+  <!-- 메인 게임 스크립트 -->
   <script type="module" src="main.js"></script>
+
+  <!-- PWA 자동 갱신 및 유틸리티 통합 스크립트 -->
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
-      });
-    }
+    // 1. 전체화면 토글
     document.getElementById('fullscreen-btn').addEventListener('click', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
@@ -50,33 +49,52 @@
         document.exitFullscreen?.();
       }
     });
-  </script>
 
-  <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
+    // 2. 캐시 비우기 & 강제 새로고침 버튼 동작
+    document.getElementById('clear-cache-btn').addEventListener('click', async () => {
       try {
-        // updateViaCache: 'none' -> sw.js 파일 자체의 브라우저 캐싱 차단
-        const reg = await navigator.serviceWorker.register('./sw.js', {
-          updateViaCache: 'none'
-        });
-
-        // 페이지 방문 시마다 서버에 새 파일이 있는지 즉시 체크
-        reg.update();
-
-        // 새 버전이 감지되어 활성화되면 자동으로 페이지 리로드
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const reg of registrations) {
+            await reg.unregister();
           }
-        });
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        // 캐시를 타지 않도록 파라미터를 붙여 완전 새로고침
+        window.location.href = window.location.origin + window.location.pathname + '?t=' + Date.now();
       } catch (err) {
-        console.error('PWA 등록 실패:', err);
+        console.error('캐시 초기화 에러:', err);
+        window.location.reload();
       }
     });
-  }
-</script>
+
+    // 3. 서비스 워커 자동 감지 및 갱신 (버전 번호 관리 불필요)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('./sw.js', {
+            updateViaCache: 'none' // sw.js 브라우저 자체 캐싱 원천 차단
+          });
+
+          // 접속할 때마다 서버의 변경사항 즉시 체크
+          reg.update();
+
+          // 새 코드가 배포되어 활성화되면 자동으로 화면 리로드
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
+        } catch (err) {
+          console.error('PWA 등록 실패:', err);
+        }
+      });
+    }
+  </script>
 </body>
 </html>
