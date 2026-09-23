@@ -51,5 +51,32 @@
       }
     });
   </script>
+
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        // updateViaCache: 'none' -> sw.js 파일 자체의 브라우저 캐싱 차단
+        const reg = await navigator.serviceWorker.register('./sw.js', {
+          updateViaCache: 'none'
+        });
+
+        // 페이지 방문 시마다 서버에 새 파일이 있는지 즉시 체크
+        reg.update();
+
+        // 새 버전이 감지되어 활성화되면 자동으로 페이지 리로드
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+      } catch (err) {
+        console.error('PWA 등록 실패:', err);
+      }
+    });
+  }
+</script>
 </body>
 </html>
