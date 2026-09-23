@@ -34,9 +34,9 @@ export class Engine {
     this.setupEvents();
   }
 
-  triggerHitStop(duration) { this.hitStopTimer = duration; }
-  triggerShake(intensity, duration) { this.shakeIntensity = intensity; this.shakeTimer = duration; }
-  triggerWhiteFlash(duration) { this.whiteFlashTimer = duration; }
+  triggerHitStop(d) { this.hitStopTimer = d; }
+  triggerShake(i, d) { this.shakeIntensity = i; this.shakeTimer = d; }
+  triggerWhiteFlash(d) { this.whiteFlashTimer = d; }
 
   setupEvents() {
     const unlock = () => this.sound.init();
@@ -44,9 +44,20 @@ export class Engine {
     window.addEventListener('keydown', unlock, { once: true });
 
     window.addEventListener('keydown', (e) => {
+      // 건너뛰기(ESC)
+      if (e.key === 'Escape') this.skipToGame();
+
+      // 대화/스토리 통합 넘김 (Enter, Space)
+      if (e.key === 'Enter' || e.key === ' ') {
+        if (GameState.mode === 'TITLE') this.handleTitleClick();
+        else if (GameState.mode === 'PROLOGUE') GameState.mode = 'TUTORIAL';
+        else if (GameState.mode === 'STAGE_RESULT') this.stageSystem.nextStage();
+        else if (GameState.mode === 'GAME_OVER') this.stageSystem.startStage(GameState.chapter, GameState.stage);
+      }
+
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.input.left = true;
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.input.right = true;
-      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') this.player.jump();
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.player.jump();
 
       if (e.key === 'j' || e.key === 'J') this.handleAction('atk');
       if (e.key === 'k' || e.key === 'K') this.handleAction('heavy');
@@ -60,15 +71,24 @@ export class Engine {
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.input.right = false;
     });
 
-    // 캔버스 클릭 시 모드별 인터랙션 (타이틀 시작, 결과창 다음 버튼)
+    // 화면 클릭/터치
     this.canvas.addEventListener('pointerdown', (e) => {
       const rect = this.canvas.getBoundingClientRect();
-      const scaleX = this.width / rect.width;
-      const scaleY = this.height / rect.height;
-      const clickX = (e.clientX - rect.left) * scaleX;
-      const clickY = (e.clientY - rect.top) * scaleY;
-      this.handleClick(clickX, clickY);
+      const clickX = (e.clientX - rect.left) * (this.width / rect.width);
+      const clickY = (e.clientY - rect.top) * (this.height / rect.height);
+
+      if (GameState.mode === 'TITLE') this.handleTitleClick();
+      else if (GameState.mode === 'PROLOGUE') GameState.mode = 'TUTORIAL';
+      else if (GameState.mode === 'STAGE_RESULT') {
+        if (clickX > 510 && clickX < 770 && clickY > 520 && clickY < 575) {
+          this.stageSystem.nextStage();
+        }
+      } else if (GameState.mode === 'GAME_OVER') {
+        this.stageSystem.startStage(GameState.chapter, GameState.stage);
+      }
     });
+
+    document.getElementById('skip-btn').addEventListener('click', () => this.skipToGame());
 
     // 모바일 터치 패드 바인딩
     const bindTouch = (id, down, up) => {
@@ -86,6 +106,17 @@ export class Engine {
     bindTouch('m-dash', () => this.handleAction('dash'));
     bindTouch('m-parry', () => this.handleAction('parry'));
     bindTouch('m-sp', () => this.handleAction('sp'));
+  }
+
+  handleTitleClick() {
+    if (!GameState.tutorialCompleted) GameState.mode = 'PROLOGUE';
+    else this.stageSystem.startStage(GameState.chapter, GameState.stage);
+  }
+
+  skipToGame() {
+    GameState.tutorialCompleted = true;
+    StorageManager.save();
+    this.stageSystem.startStage(GameState.chapter, GameState.stage);
   }
 
   handleAction(action) {
@@ -134,41 +165,14 @@ export class Engine {
       this.triggerHitStop(0.2);
       this.triggerShake(16, 0.4);
       this.triggerWhiteFlash(0.12);
-      this.brush.addSlash(640, 360, 1, 'special');
-      this.enemies.forEach((e) => e.takeDamage(150, this.ink));
+      this.brush.addSlash(this.player.x + 200, 360, 1, 'special');
+      this.enemies.forEach(e => e.takeDamage(150, this.ink));
       if (this.boss) this.boss.takeDamage(120, this.ink);
-      this.ink.splash(640, 360, 45);
-    }
-  }
-
-  handleClick(x, y) {
-    if (GameState.mode === 'TITLE') {
-      // [여정 시작] 버튼 영역
-      if (x > 500 && x < 780 && y > 460 && y < 530) {
-        if (!GameState.tutorialCompleted) {
-          GameState.mode = 'PROLOGUE';
-        } else {
-          this.stageSystem.startStage(GameState.chapter, GameState.stage);
-        }
-      }
-    } else if (GameState.mode === 'PROLOGUE') {
-      // 프롤로그 화면 클릭 시 튜토리얼로 전환
-      GameState.mode = 'TUTORIAL';
-      GameState.tutorialStep = 0;
-      GameState.ink = 100;
-    } else if (GameState.mode === 'STAGE_RESULT') {
-      // [다음 장으로 →] 버튼 영역
-      if (x > 500 && x < 780 && y > 510 && y < 575) {
-        this.stageSystem.nextStage();
-      }
-    } else if (GameState.mode === 'GAME_OVER') {
-      // 재도전
-      this.stageSystem.startStage(GameState.chapter, GameState.stage);
+      this.ink.splash(this.player.x + 200, 360, 45);
     }
   }
 
   init() {
-    // 1. 저장 데이터 안전 로드 (이후 절대 reset으로 덮어쓰지 않음!)
     StorageManager.load();
     GameState.mode = 'TITLE';
   }
@@ -196,12 +200,18 @@ export class Engine {
   }
 
   update(dt) {
-    this.skyline.update(dt, this.player.vx);
+    this.skyline.update(dt);
     this.brush.update(dt);
     this.ink.update(dt);
 
     if (GameState.mode === 'PLAYING') {
       this.player.update(dt, this.input);
+
+      // 부드러운 카메라 추적 (Lerp)
+      const targetCamX = this.player.x - 450;
+      const maxCamX = GameState.worldWidth - this.width;
+      GameState.cameraX += (Math.max(0, Math.min(maxCamX, targetCamX)) - GameState.cameraX) * 0.1;
+
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const e = this.enemies[i];
         e.update(dt, this.player, this.ink, this);
@@ -210,12 +220,9 @@ export class Engine {
           this.enemies.splice(i, 1);
         }
       }
-      if (this.boss) {
-        this.boss.update(dt, this.player, this.ink, this);
-      }
+
+      if (this.boss) this.boss.update(dt, this.player, this.ink, this);
       this.stageSystem.update(dt);
-    } else if (GameState.mode === 'TUTORIAL') {
-      this.player.update(dt, this.input);
     } else if (GameState.mode === 'STAGE_INTRO') {
       this.stageSystem.update(dt);
     }
@@ -225,38 +232,49 @@ export class Engine {
     const ctx = this.ctx;
     ctx.save();
 
-    // 화면 흔들림
+    // 1. 화면 흔들림
     if (this.shakeTimer > 0) {
       this.shakeTimer -= 0.016;
       ctx.translate((Math.random() - 0.5) * this.shakeIntensity, (Math.random() - 0.5) * this.shakeIntensity);
     }
 
-    // 기본 한지 배경
+    // 2. 한지 배경 클리어
     ctx.fillStyle = "#f7f4eb";
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // 수묵 산수 배경
-    this.skyline.render(GameState.chapter);
+    // 3. 월드 카메라 좌표계 적용 (월드 객체 렌더링)
+    ctx.save();
+    ctx.translate(-GameState.cameraX, 0);
 
-    // 인게임 오브젝트
-    if (GameState.mode === 'PLAYING' || GameState.mode === 'TUTORIAL') {
-      this.enemies.forEach((e) => e.render());
-      if (this.boss) this.boss.render();
-      this.player.render();
+    // 패럴랙스 수묵 배경
+    this.skyline.render(GameState.cameraX, GameState.chapter, GameState.worldWidth);
+
+    // 결계 묵선 렌더링 (활성 시)
+    if (GameState.activeBarrierX !== null) {
+      ctx.fillStyle = "rgba(20, 16, 12, 0.75)";
+      ctx.fillRect(GameState.activeBarrierX, 0, 14, 620);
+      ctx.strokeStyle = "#8a2420";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(GameState.activeBarrierX, 0, 14, 620);
     }
 
-    // 브러시 및 먹물 번짐
+    // 엔티티 및 이펙트 (뷰포트 컬링 내장)
+    this.enemies.forEach(e => e.render(GameState.cameraX));
+    if (this.boss) this.boss.render(GameState.cameraX);
+    this.player.render();
     this.brush.render();
-    this.ink.render();
+    this.ink.render(GameState.cameraX);
 
-    // 백색 여백 섬광 (패링/필살기)
+    ctx.restore(); // 월드 좌표계 복원 ➔ 스크린 UI 모드로 전환
+
+    // 백색 여백 섬광
     if (this.whiteFlashTimer > 0) {
       this.whiteFlashTimer -= 0.016;
       ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
       ctx.fillRect(0, 0, this.width, this.height);
     }
 
-    // 모드별 오버레이 렌더링
+    // 4. 고정 화면 UI 오버레이
     if (GameState.mode === 'TITLE') this.renderTitle();
     else if (GameState.mode === 'PROLOGUE') this.renderPrologue();
     else if (GameState.mode === 'TUTORIAL') this.renderTutorial();
@@ -268,10 +286,9 @@ export class Engine {
     ctx.restore();
   }
 
-  // 1. 타이틀 화면
   renderTitle() {
     const ctx = this.ctx;
-    ctx.fillStyle = "rgba(247, 244, 235, 0.85)";
+    ctx.fillStyle = "rgba(247, 244, 235, 0.88)";
     ctx.fillRect(0, 0, this.width, this.height);
 
     ctx.fillStyle = "#1e1a16";
@@ -283,7 +300,6 @@ export class Engine {
     ctx.fillStyle = "#5c5245";
     ctx.fillText("— 색을 잃은 한양, 붓끝으로 베어내다 —", 640, 320);
 
-    // 시작 도장 버튼
     ctx.fillStyle = "#8a2420";
     ctx.fillRect(520, 460, 240, 60);
     ctx.strokeStyle = "#4d1412";
@@ -295,10 +311,9 @@ export class Engine {
     ctx.fillText("여 정 시 작", 640, 498);
   }
 
-  // 2. 프롤로그
   renderPrologue() {
     const ctx = this.ctx;
-    ctx.fillStyle = "rgba(18, 15, 12, 0.94)";
+    ctx.fillStyle = "rgba(18, 15, 12, 0.95)";
     ctx.fillRect(0, 0, this.width, this.height);
 
     ctx.fillStyle = "#f7f4eb";
@@ -310,14 +325,13 @@ export class Engine {
 
     ctx.font = "18px 'Noto Serif KR', 'Batang', serif";
     ctx.fillStyle = "#a89f91";
-    ctx.fillText("화면을 누르면 검을 손에 쥡니다...", 640, 480);
+    ctx.fillText("Enter, Space, 또는 화면을 누르면 검을 쥡니다...", 640, 480);
   }
 
-  // 3. 인터랙티브 조작 튜토리얼
   renderTutorial() {
     const ctx = this.ctx;
     ctx.save();
-    ctx.fillStyle = "rgba(30, 26, 22, 0.82)";
+    ctx.fillStyle = "rgba(30, 26, 22, 0.85)";
     ctx.fillRect(240, 60, 800, 110);
     ctx.strokeStyle = "#8a7e6d";
     ctx.lineWidth = 2;
@@ -331,7 +345,7 @@ export class Engine {
       "검을 들어보십시오: [ J ] 키를 눌러 참격(斬)을 시전하십시오.",
       "먹을 실어 바위를 쪼개십시오: [ K ] 키로 강공격(破)을 펼치십시오.",
       "위험할 때 몸을 먹물로 흘리십시오: [ L / Shift ] 키로 대시(迅)하십시오.",
-      "적의 칼날 직전 검을 세우십시오: [ I / Q ] 키로 패링(返)하십시오.",
+      "백색 섬광이 번뜩일 때 검을 세우십시오: [ I / Q ] 키로 패링(返)하십시오.",
       "먹이 가득 찼습니다. 모든 것을 베어내십시오: [ U / E ] 필살(墨)!"
     ];
 
@@ -339,42 +353,39 @@ export class Engine {
     ctx.restore();
   }
 
-  // 4. 스테이지 인트로 (여백의 장 안내)
   renderStageIntro() {
     const ctx = this.ctx;
-    ctx.fillStyle = "rgba(247, 244, 235, 0.9)";
+    ctx.fillStyle = "rgba(247, 244, 235, 0.92)";
     ctx.fillRect(0, 0, this.width, this.height);
 
     ctx.fillStyle = "#1e1a16";
     ctx.font = "bold 48px 'Noto Serif KR', 'Batang', serif";
     ctx.textAlign = "center";
-    const chNames = ["", "第一章 江西 (강서)", "第二章 江北 (강북)"];
+    const chNames = ["", "第一章 江西 (강서)", "第二章 江北 (강북)", "第三章 江東 (강동)", "第四章 江南 (강남)"];
     ctx.fillText(chNames[GameState.chapter] || "종장 (終章)", 640, 320);
 
     ctx.font = "24px 'Noto Serif KR', 'Batang', serif";
     ctx.fillStyle = "#5c5245";
-    ctx.fillText(`제 ${GameState.stage} 막 — 나루터 갈대밭의 자객들`, 640, 380);
+    ctx.fillText(`제 ${GameState.stage} 막 — 나루터 갈대밭과 서쪽 관문`, 640, 380);
   }
 
-  // 5. 절제된 수묵 HUD & 하단 조작 가이드
   renderHUD() {
     const ctx = this.ctx;
     ctx.save();
 
-    // 상단 챕터
     ctx.fillStyle = "#221c17";
     ctx.font = "bold 18px 'Noto Serif KR', 'Batang', serif";
     ctx.textAlign = "left";
-    ctx.fillText(GameState.chapter === 1 ? "第一章 江西" : "第二章 江北", 40, 45);
+    ctx.fillText(`第一章 江西 — 제 ${GameState.stage} 막`, 40, 45);
 
-    // 白 (체력)
+    // HP (白)
     ctx.fillText("白", 40, 78);
     ctx.fillStyle = "#d5cebe";
     ctx.fillRect(68, 65, 160, 14);
     ctx.fillStyle = "#8a2420";
     ctx.fillRect(68, 65, (GameState.hp / GameState.maxHp) * 160, 14);
 
-    // 墨 (먹 게이지)
+    // 墨
     ctx.fillStyle = "#221c17";
     ctx.fillText("墨", 40, 108);
     ctx.fillStyle = "#d5cebe";
@@ -382,13 +393,20 @@ export class Engine {
     ctx.fillStyle = "#1e1a16";
     ctx.fillRect(68, 95, (GameState.ink / GameState.maxInk) * 160, 14);
 
+    // 콤보
     if (GameState.combo > 1) {
       ctx.fillStyle = "#8a2420";
       ctx.font = "bold 26px 'Noto Serif KR', 'Batang', serif";
       ctx.fillText(`${GameState.combo} 斬!`, 40, 150);
     }
 
-    // 화면 우측 하단 미니 조작 가이드
+    // 미니 진행도 바 (월드 3800px 진행률)
+    const prog = Math.min(1.0, this.player.x / GameState.worldWidth);
+    ctx.fillStyle = "#d5cebe";
+    ctx.fillRect(540, 25, 200, 6);
+    ctx.fillStyle = "#1e1a16";
+    ctx.fillRect(540, 25, 200 * prog, 6);
+
     ctx.fillStyle = "rgba(40, 34, 28, 0.75)";
     ctx.font = "14px 'Noto Serif KR', 'Batang', serif";
     ctx.textAlign = "right";
@@ -397,12 +415,11 @@ export class Engine {
     ctx.restore();
   }
 
-  // 6. 평정 결과 및 다음 장 버튼
   renderResult() {
     const ctx = this.ctx;
     const rank = this.stageSystem.calculateRank();
 
-    ctx.fillStyle = "rgba(247, 244, 235, 0.94)";
+    ctx.fillStyle = "rgba(247, 244, 235, 0.95)";
     ctx.fillRect(340, 110, 600, 500);
     ctx.strokeStyle = "#383127";
     ctx.lineWidth = 3;
@@ -412,13 +429,6 @@ export class Engine {
     ctx.font = "bold 32px 'Noto Serif KR', 'Batang', serif";
     ctx.textAlign = "center";
     ctx.fillText("강 서 평 정 (江西平定)", 640, 175);
-
-    ctx.strokeStyle = "#857867";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(390, 200);
-    ctx.lineTo(890, 200);
-    ctx.stroke();
 
     ctx.font = "18px 'Noto Serif KR', 'Batang', serif";
     ctx.fillText(`처치한 자객 : ${GameState.kills} 명`, 640, 250);
@@ -431,7 +441,6 @@ export class Engine {
     ctx.fillStyle = "#8a2420";
     ctx.fillText(rank, 640, 480);
 
-    // [ 다음 장으로 → ] 도장형 버튼
     ctx.fillStyle = "#8a2420";
     ctx.fillRect(510, 520, 260, 55);
     ctx.strokeStyle = "#4d1412";
@@ -443,7 +452,6 @@ export class Engine {
     ctx.fillText("다 음 장 으 로  ➔", 640, 555);
   }
 
-  // 7. 패배 화면
   renderGameOver() {
     const ctx = this.ctx;
     ctx.fillStyle = "rgba(18, 15, 12, 0.92)";
@@ -455,6 +463,6 @@ export class Engine {
     ctx.fillText("검이 꺾이고 먹이 흩어지다", 640, 330);
 
     ctx.font = "20px 'Noto Serif KR', 'Batang', serif";
-    ctx.fillText("화면을 눌러 다시 검을 잡으십시오", 640, 395);
+    ctx.fillText("Space 또는 화면을 눌러 다시 검을 잡으십시오", 640, 395);
   }
 }
