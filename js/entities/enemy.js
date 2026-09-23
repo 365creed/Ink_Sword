@@ -3,20 +3,23 @@ export class Enemy {
     this.ctx = ctx;
     this.x = x;
     this.y = y;
-    this.type = type; // 'grunt'(묵객), 'archer'(궁수), 'rusher'(도깨비)
+    this.type = type; // grunt, archer, rusher
 
     if (type === 'grunt') {
-      this.w = 54; this.h = 92; this.hp = 55; this.speed = 110; this.dmg = 12;
+      this.w = 54; this.h = 92; this.hp = 55; this.speed = 115; this.dmg = 12;
     } else if (type === 'archer') {
       this.w = 50; this.h = 86; this.hp = 38; this.speed = 85; this.dmg = 14;
     } else {
-      this.w = 64; this.h = 78; this.hp = 35; this.speed = 230; this.dmg = 18;
+      this.w = 64; this.h = 78; this.hp = 35; this.speed = 240; this.dmg = 18;
     }
 
     this.isDead = false;
-    this.deathTimer = 0.35; // 사망 시 먹물로 녹아내리는 시간
-    this.atkCooldown = Math.random() * 1.5 + 1.0;
-    this.isTelegraphing = false;
+    this.deathTimer = 0.35;
+    this.atkCooldown = Math.random() * 1.5 + 1.2;
+
+    // 3단계 전조 애니메이션 변수
+    this.phase = 'idle'; // idle, windup (0.35s), tell (0.12s 패링섬광), swing, recovery (0.4s 헛방)
+    this.phaseTimer = 0;
   }
 
   takeDamage(amount, ink) {
@@ -36,43 +39,69 @@ export class Enemy {
     const dist = Math.abs(this.x - player.x);
     this.atkCooldown -= dt;
 
-    if (this.type === 'grunt') {
-      if (dist > 65) {
-        this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
-        this.isTelegraphing = false;
-      } else {
-        if (this.atkCooldown <= 0.45 && this.atkCooldown > 0) {
-          this.isTelegraphing = true;
-        } else if (this.atkCooldown <= 0) {
-          this.isTelegraphing = false;
+    if (this.phaseTimer > 0) {
+      this.phaseTimer -= dt;
+      if (this.phaseTimer <= 0) {
+        if (this.phase === 'windup') {
+          // 2단계: 번뜩이는 패링 섬광 발생! (0.12초)
+          this.phase = 'tell';
+          this.phaseTimer = 0.12;
+        } else if (this.phase === 'tell') {
+          // 3단계: 실제 타격 실행
+          this.phase = 'swing';
+          if (dist < (this.type === 'archer' ? 550 : 90)) {
+            const res = player.takeDamage(this.dmg, ink, engine);
+            if (res === 'parried') {
+              this.phase = 'recovery';
+              this.phaseTimer = 0.6; // 패링당하면 긴 그로기
+            } else {
+              this.phase = 'idle';
+              this.atkCooldown = 2.0;
+            }
+          } else {
+            // 헛방 친 경우 바닥에 칼 박힘 (0.4초 그로기)
+            this.phase = 'recovery';
+            this.phaseTimer = 0.4;
+          }
+        } else if (this.phase === 'recovery') {
+          this.phase = 'idle';
           this.atkCooldown = 1.8;
-          player.takeDamage(this.dmg, ink, engine);
         }
+      }
+      return; // 공격 전조 중에는 이동 정지
+    }
+
+    // 통상 이동
+    if (this.type === 'grunt') {
+      if (dist > 70) {
+        this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
+      } else if (this.atkCooldown <= 0) {
+        this.phase = 'windup';
+        this.phaseTimer = 0.35;
       }
     } else if (this.type === 'archer') {
       if (dist < 320) this.x += (player.x > this.x ? -1 : 1) * this.speed * dt;
-      if (this.atkCooldown <= 0.5 && this.atkCooldown > 0) {
-        this.isTelegraphing = true;
-      } else if (this.atkCooldown <= 0) {
-        this.isTelegraphing = false;
-        this.atkCooldown = 2.4;
-        if (dist < 580) player.takeDamage(this.dmg, ink, engine);
+      if (this.atkCooldown <= 0 && dist < 600) {
+        this.phase = 'windup';
+        this.phaseTimer = 0.4;
       }
     } else {
       this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
-      if (dist < 55 && this.atkCooldown <= 0) {
-        this.atkCooldown = 1.3;
-        player.takeDamage(this.dmg, ink, engine);
+      if (dist < 60 && this.atkCooldown <= 0) {
+        this.phase = 'windup';
+        this.phaseTimer = 0.25;
       }
     }
   }
 
-  render() {
+  render(cameraX) {
+    // 뷰포트 컬링
+    if (this.x + this.w < cameraX - 50 || this.x > cameraX + 1330) return;
+
     const ctx = this.ctx;
     ctx.save();
 
     if (this.isDead) {
-      // 사망 시 먹물로 무너지며 녹아내림
       const alpha = Math.max(0, this.deathTimer / 0.35);
       ctx.fillStyle = `rgba(20, 16, 12, ${alpha * 0.7})`;
       ctx.beginPath();
@@ -82,39 +111,47 @@ export class Enemy {
       return;
     }
 
-    ctx.fillStyle = this.isTelegraphing ? "#701818" : "#241f1a";
+    // 1단계 준비: 몸을 뒤로 젖힘 / 헛방 그로기: 앞으로 꼬꾸라짐
+    ctx.translate(this.x + this.w / 2, this.y + this.h);
+    if (this.phase === 'windup') ctx.rotate(0.15);
+    if (this.phase === 'recovery') ctx.rotate(-0.25);
+
+    ctx.fillStyle = this.phase === 'windup' ? "#681818" : (this.phase === 'recovery' ? "#383228" : "#241f1a");
 
     if (this.type === 'grunt') {
-      // 삿갓 묵객
+      ctx.fillRect(-this.w / 2, -this.h + 16, this.w, this.h - 16);
       ctx.beginPath();
-      ctx.moveTo(this.x + this.w / 2, this.y);
-      ctx.lineTo(this.x + this.w + 6, this.y + 16);
-      ctx.lineTo(this.x - 6, this.y + 16);
+      ctx.moveTo(0, -this.h);
+      ctx.lineTo(this.w / 2 + 8, -this.h + 16);
+      ctx.lineTo(-this.w / 2 - 8, -this.h + 16);
       ctx.closePath();
       ctx.fill();
-      ctx.fillRect(this.x + 8, this.y + 16, this.w - 16, this.h - 16);
     } else if (this.type === 'archer') {
-      // 각궁을 든 궁수 실루엣
-      ctx.fillRect(this.x + 10, this.y + 10, this.w - 20, this.h - 10);
+      ctx.fillRect(-this.w / 2 + 5, -this.h + 10, this.w - 10, this.h - 10);
       ctx.strokeStyle = "#40382f";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(this.x - 4, this.y + 35, 26, -Math.PI * 0.4, Math.PI * 0.4);
+      ctx.arc(-this.w / 2, -this.h / 2, 28, -Math.PI * 0.4, Math.PI * 0.4);
       ctx.stroke();
     } else {
-      // 뿔 달린 웅크린 도깨비
-      ctx.fillRect(this.x, this.y + 14, this.w, this.h - 14);
+      ctx.fillRect(-this.w / 2, -this.h + 14, this.w, this.h - 14);
       ctx.beginPath();
-      ctx.moveTo(this.x + 10, this.y + 14);
-      ctx.lineTo(this.x + 18, this.y - 6);
-      ctx.lineTo(this.x + 24, this.y + 14);
+      ctx.moveTo(-10, -this.h + 14);
+      ctx.lineTo(-2, -this.h - 8);
+      ctx.lineTo(6, -this.h + 14);
       ctx.fill();
     }
 
-    // 붉은 안광
-    ctx.fillStyle = this.isTelegraphing ? "#ff2424" : "#a82424";
-    ctx.fillRect(this.x + 14, this.y + 20, 6, 4);
-    ctx.fillRect(this.x + this.w - 20, this.y + 20, 6, 4);
+    // 2단계 패링 텔레그래프: 번뜩이는 백색 섬광 (★)
+    if (this.phase === 'tell') {
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.arc(0, -this.h - 15, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
 
     ctx.restore();
   }
