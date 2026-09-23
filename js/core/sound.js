@@ -9,23 +9,19 @@ export class SoundEngine {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioCtx();
     }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
     this.unlocked = true;
   }
 
-  // 1. 검격: 대나무/붓을 가르는 날카로운 바람 소리 (노이즈 스윕)
   playSlash() {
     if (!this.unlocked) return;
-    const bufferSize = this.ctx.sampleRate * 0.12;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const bufSize = this.ctx.sampleRate * 0.12;
+    const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
 
     const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-
+    noise.buffer = buf;
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.setValueAtTime(1400, this.ctx.currentTime);
@@ -33,7 +29,7 @@ export class SoundEngine {
     filter.Q.value = 3.0;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+    gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
 
     noise.connect(filter);
@@ -42,7 +38,6 @@ export class SoundEngine {
     noise.start();
   }
 
-  // 2. 강공격: 묵직한 붓질과 파공음
   playHeavySlash() {
     if (!this.unlocked) return;
     this.playSlash();
@@ -59,7 +54,6 @@ export class SoundEngine {
     osc.stop(this.ctx.currentTime + 0.26);
   }
 
-  // 3. 패링: 맑고 날카로운 쇠 튕김
   playParry() {
     if (!this.unlocked) return;
     [1600, 3200, 4800].forEach((freq) => {
@@ -76,7 +70,6 @@ export class SoundEngine {
     });
   }
 
-  // 4. 먹물 떨어지는 소리 (적 피격/물방울)
   playInkDrop() {
     if (!this.unlocked) return;
     const osc = this.ctx.createOscillator();
@@ -92,7 +85,6 @@ export class SoundEngine {
     osc.stop(this.ctx.currentTime + 0.09);
   }
 
-  // 5. 북소리 (대북 - 보스/스테이지 시작)
   playDrum() {
     if (!this.unlocked) return;
     const osc = this.ctx.createOscillator();
@@ -108,7 +100,6 @@ export class SoundEngine {
     osc.stop(this.ctx.currentTime + 0.7);
   }
 
-  // 6. 대시: 순간적인 바람 소리
   playDash() {
     if (!this.unlocked) return;
     const osc = this.ctx.createOscillator();
