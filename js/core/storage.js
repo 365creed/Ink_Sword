@@ -1,7 +1,7 @@
 import { GameState } from './state.js';
 
 export const StorageManager = {
-  KEY: 'ink_sword_master_save_v7',
+  KEY: 'ink_sword_master_save_v8',
 
   save() {
     try {
@@ -13,9 +13,7 @@ export const StorageManager = {
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(this.KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   },
 
   load() {
@@ -29,9 +27,7 @@ export const StorageManager = {
         GameState.bestRanks = d.bestRanks || {};
         return d;
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
     return null;
   }
 };
