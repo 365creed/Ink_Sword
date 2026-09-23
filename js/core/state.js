@@ -1,14 +1,17 @@
 export const GameState = {
-  // 모드: 'TITLE', 'PROLOGUE', 'TUTORIAL', 'STAGE_INTRO', 'PLAYING', 'STAGE_RESULT', 'GAME_OVER'
+  // 모드: TITLE, PROLOGUE, TUTORIAL, STAGE_INTRO, PLAYING, STAGE_RESULT, GAME_OVER
   mode: 'TITLE',
 
-  // 영구 진행 데이터
-  chapter: 1,      // 1: 강서(江西), 2: 강북(江北)
-  stage: 1,        // 1, 2, 3(보스)
+  chapter: 1, // 1: 강서, 2: 강북, 3: 강동, 4: 강남, 5: 중앙
+  stage: 1,
+  worldWidth: 3800,
+  cameraX: 0,
+  activeBarrierX: null, // 결계 잠금 X 좌표
+
   tutorialCompleted: false,
   bestRanks: {},
 
-  // 스테이지 전투 실시간 수치
+  // 전투 스탯
   hp: 100,
   maxHp: 100,
   ink: 60,
@@ -22,7 +25,6 @@ export const GameState = {
   stageStartTime: 0,
   clearTimeStr: "00:00",
 
-  // 튜토리얼 내부 스텝 (0:참, 1:파, 2:신, 3:반, 4:묵)
   tutorialStep: 0,
 
   addCombo() {
@@ -46,7 +48,6 @@ export const GameState = {
     return false;
   },
 
-  // 스테이지 진입 시 전투 상태만 초기화 (진행도는 유지!)
   resetForStage() {
     this.hp = this.maxHp;
     this.ink = 60;
@@ -55,6 +56,8 @@ export const GameState = {
     this.kills = 0;
     this.parries = 0;
     this.hitsTaken = 0;
+    this.cameraX = 0;
+    this.activeBarrierX = null;
     this.stageStartTime = Date.now();
   }
 };
