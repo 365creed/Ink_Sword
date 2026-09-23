@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ink-sword-v7-complete';
+const CACHE_NAME = 'ink-sword-v8-netfirst';
 const ASSETS = [
   './index.html',
   './style.css',
@@ -25,15 +25,24 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null))
-    ))
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null)))
+    )
   );
   self.clients.claim();
 });
 
+// 네트워크 우선(Network-First) 핸들러
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((res) => res || fetch(e.request).catch(() => caches.match('./index.html')))
+    fetch(e.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(e.request).then((cached) => cached || caches.match('./index.html')))
   );
 });
