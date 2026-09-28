@@ -1,3 +1,5 @@
+import { CHAPTER_DATA } from '../systems/stageData.js';
+
 export const GameState = {
   mode: 'TITLE', // TITLE, PROLOGUE, TUTORIAL, STAGE_INTRO, PLAYING, STAGE_RESULT, GAME_OVER
 
@@ -5,19 +7,20 @@ export const GameState = {
   stage: 1,
   worldWidth: 3800,
   cameraX: 0,
-  activeBarrierX: null,
+  minBarrierX: null,    // 후방 결계 벽
+  activeBarrierX: null, // 전방 결계 벽
 
   // UI/UX 상태
   isPaused: false,
   isHelpOpen: false,
-  guideTimer: 5.0, // 5초 자동 감추기
+  guideTimer: 5.0,
   saveToastTimer: 0,
   saveToastText: '',
 
   tutorialCompleted: false,
   bestRanks: {},
 
-  // 전투 실시간 수치
+  // 전투 스탯
   hp: 100,
   maxHp: 100,
   ink: 60,
@@ -59,6 +62,15 @@ export const GameState = {
     this.saveToastTimer = 1.6;
   },
 
+  getCurrentChapterData() {
+    return CHAPTER_DATA[this.chapter] || CHAPTER_DATA[1];
+  },
+
+  getCurrentStageData() {
+    const ch = this.getCurrentChapterData();
+    return ch.stages[this.stage] || ch.stages[1];
+  },
+
   resetForStage() {
     this.hp = this.maxHp;
     this.ink = 60;
@@ -68,6 +80,7 @@ export const GameState = {
     this.parries = 0;
     this.hitsTaken = 0;
     this.cameraX = 0;
+    this.minBarrierX = null;
     this.activeBarrierX = null;
     this.isPaused = false;
     this.isHelpOpen = false;
