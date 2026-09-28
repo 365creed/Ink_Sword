@@ -1,3 +1,5 @@
+import { GameState } from '../core/state.js';
+
 export class Boss {
   constructor(ctx, x, y) {
     this.ctx = ctx;
@@ -40,7 +42,7 @@ export class Boss {
       if (this.stepTimer <= 0) {
         if (this.phaseStep === 'windup') {
           this.phaseStep = 'tell';
-          this.stepTimer = 0.14;
+          this.stepTimer = 0.14; // 거대 보스 패링 섬광
         } else if (this.phaseStep === 'tell') {
           this.phaseStep = 'swing';
           if (dist < 150) {
@@ -64,12 +66,20 @@ export class Boss {
       return;
     }
 
+    let bossMaxX = GameState.worldWidth - 60;
+    if (GameState.activeBarrierX !== null) {
+      bossMaxX = GameState.activeBarrierX - 160;
+    }
+    let bossMinX = GameState.minBarrierX !== null ? GameState.minBarrierX + 60 : 30;
+
     if (dist > 105) {
       this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
     } else if (this.stateTimer <= 0) {
       this.phaseStep = 'windup';
       this.stepTimer = 0.45;
     }
+
+    this.x = Math.max(bossMinX, Math.min(bossMaxX, this.x));
   }
 
   render(cameraX) {
@@ -96,9 +106,9 @@ export class Boss {
     if (this.phaseStep === 'tell') {
       ctx.fillStyle = "#ffffff";
       ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 24;
       ctx.beginPath();
-      ctx.arc(0, -this.h - 25, 14, 0, Math.PI * 2);
+      ctx.arc(0, -this.h - 25, 16, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
