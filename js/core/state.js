@@ -1,17 +1,23 @@
 export const GameState = {
-  // 모드: TITLE, PROLOGUE, TUTORIAL, STAGE_INTRO, PLAYING, STAGE_RESULT, GAME_OVER
-  mode: 'TITLE',
+  mode: 'TITLE', // TITLE, PROLOGUE, TUTORIAL, STAGE_INTRO, PLAYING, STAGE_RESULT, GAME_OVER
 
-  chapter: 1, // 1: 강서, 2: 강북, 3: 강동, 4: 강남, 5: 중앙
+  chapter: 1,
   stage: 1,
   worldWidth: 3800,
   cameraX: 0,
-  activeBarrierX: null, // 결계 잠금 X 좌표
+  activeBarrierX: null,
+
+  // UI/UX 상태
+  isPaused: false,
+  isHelpOpen: false,
+  guideTimer: 5.0, // 5초 자동 감추기
+  saveToastTimer: 0,
+  saveToastText: '',
 
   tutorialCompleted: false,
   bestRanks: {},
 
-  // 전투 스탯
+  // 전투 실시간 수치
   hp: 100,
   maxHp: 100,
   ink: 60,
@@ -23,7 +29,7 @@ export const GameState = {
   parries: 0,
   hitsTaken: 0,
   stageStartTime: 0,
-  clearTimeStr: "00:00",
+  clearTimeStr: '00:00',
 
   tutorialStep: 0,
 
@@ -48,6 +54,11 @@ export const GameState = {
     return false;
   },
 
+  showToast(msg) {
+    this.saveToastText = msg;
+    this.saveToastTimer = 1.6;
+  },
+
   resetForStage() {
     this.hp = this.maxHp;
     this.ink = 60;
@@ -58,6 +69,9 @@ export const GameState = {
     this.hitsTaken = 0;
     this.cameraX = 0;
     this.activeBarrierX = null;
+    this.isPaused = false;
+    this.isHelpOpen = false;
+    this.guideTimer = 5.0;
     this.stageStartTime = Date.now();
   }
 };
