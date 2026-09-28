@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>묵검 (墨劍) - 수묵 액션</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
@@ -11,13 +11,11 @@
 </head>
 <body>
   <div id="app-container">
+    <!-- 간결해진 상단 3버튼 헤더 -->
     <div class="top-nav">
       <button id="pause-btn" class="ink-btn">❚❚ 일시정지 (P)</button>
       <button id="help-btn" class="ink-btn">? 조작법 (H)</button>
-      <button id="save-btn" class="ink-btn">💾 저장 (V)</button>
-      <button id="clear-cache-btn" class="ink-btn">⚡ 캐시비우기 (C)</button>
       <button id="fullscreen-btn" class="ink-btn">⛶ 전체화면 (F)</button>
-      <button id="skip-btn" class="ink-btn" style="color: #8a2420;">건너뛰기 (ESC)</button>
     </div>
 
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
