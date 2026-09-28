@@ -3,7 +3,7 @@ export class Enemy {
     this.ctx = ctx;
     this.x = x;
     this.y = y;
-    this.type = type; // grunt, archer, rusher
+    this.type = type;
 
     if (type === 'grunt') {
       this.w = 54; this.h = 92; this.hp = 55; this.speed = 115; this.dmg = 12;
@@ -17,8 +17,7 @@ export class Enemy {
     this.deathTimer = 0.35;
     this.atkCooldown = Math.random() * 1.5 + 1.2;
 
-    // 3단계 전조 애니메이션 변수
-    this.phase = 'idle'; // idle, windup (0.35s), tell (0.12s 패링섬광), swing, recovery (0.4s 헛방)
+    this.phase = 'idle'; // idle, windup(0.35s), tell(0.12s), swing, recovery(0.4s)
     this.phaseTimer = 0;
   }
 
@@ -43,23 +42,20 @@ export class Enemy {
       this.phaseTimer -= dt;
       if (this.phaseTimer <= 0) {
         if (this.phase === 'windup') {
-          // 2단계: 번뜩이는 패링 섬광 발생! (0.12초)
           this.phase = 'tell';
           this.phaseTimer = 0.12;
         } else if (this.phase === 'tell') {
-          // 3단계: 실제 타격 실행
           this.phase = 'swing';
           if (dist < (this.type === 'archer' ? 550 : 90)) {
             const res = player.takeDamage(this.dmg, ink, engine);
             if (res === 'parried') {
               this.phase = 'recovery';
-              this.phaseTimer = 0.6; // 패링당하면 긴 그로기
+              this.phaseTimer = 0.6;
             } else {
               this.phase = 'idle';
               this.atkCooldown = 2.0;
             }
           } else {
-            // 헛방 친 경우 바닥에 칼 박힘 (0.4초 그로기)
             this.phase = 'recovery';
             this.phaseTimer = 0.4;
           }
@@ -68,10 +64,9 @@ export class Enemy {
           this.atkCooldown = 1.8;
         }
       }
-      return; // 공격 전조 중에는 이동 정지
+      return;
     }
 
-    // 통상 이동
     if (this.type === 'grunt') {
       if (dist > 70) {
         this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
@@ -95,7 +90,6 @@ export class Enemy {
   }
 
   render(cameraX) {
-    // 뷰포트 컬링
     if (this.x + this.w < cameraX - 50 || this.x > cameraX + 1330) return;
 
     const ctx = this.ctx;
@@ -111,7 +105,6 @@ export class Enemy {
       return;
     }
 
-    // 1단계 준비: 몸을 뒤로 젖힘 / 헛방 그로기: 앞으로 꼬꾸라짐
     ctx.translate(this.x + this.w / 2, this.y + this.h);
     if (this.phase === 'windup') ctx.rotate(0.15);
     if (this.phase === 'recovery') ctx.rotate(-0.25);
@@ -142,7 +135,7 @@ export class Enemy {
       ctx.fill();
     }
 
-    // 2단계 패링 텔레그래프: 번뜩이는 백색 섬광 (★)
+    // 백색 섬광 패링 텔레그래프 (★)
     if (this.phase === 'tell') {
       ctx.fillStyle = "#ffffff";
       ctx.shadowColor = "#ffffff";
