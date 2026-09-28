@@ -12,9 +12,12 @@
 <body>
   <div id="app-container">
     <div class="top-nav">
-      <button id="skip-btn" class="ink-btn" style="color: #8a2420;">건너뛰기 ➔ (ESC)</button>
-      <button id="clear-cache-btn" class="ink-btn">캐시 비우기</button>
-      <button id="fullscreen-btn" class="ink-btn">전체화면</button>
+      <button id="pause-btn" class="ink-btn">❚❚ 일시정지 (P)</button>
+      <button id="help-btn" class="ink-btn">? 조작법 (H)</button>
+      <button id="save-btn" class="ink-btn">💾 저장 (V)</button>
+      <button id="clear-cache-btn" class="ink-btn">⚡ 캐시비우기 (C)</button>
+      <button id="fullscreen-btn" class="ink-btn">⛶ 전체화면 (F)</button>
+      <button id="skip-btn" class="ink-btn" style="color: #8a2420;">건너뛰기 (ESC)</button>
     </div>
 
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
@@ -38,30 +41,6 @@
   <script type="module" src="main.js"></script>
 
   <script>
-    document.getElementById('fullscreen-btn').addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else {
-        document.exitFullscreen?.();
-      }
-    });
-
-    document.getElementById('clear-cache-btn').addEventListener('click', async () => {
-      try {
-        if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (const reg of regs) await reg.unregister();
-        }
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map(k => caches.delete(k)));
-        }
-        window.location.href = window.location.origin + window.location.pathname + '?t=' + Date.now();
-      } catch (e) {
-        window.location.reload();
-      }
-    });
-
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', async () => {
         try {
