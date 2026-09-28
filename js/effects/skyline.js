@@ -14,7 +14,7 @@ export class SkylineEffect {
     const ctx = this.ctx;
     ctx.save();
 
-    // 1. 원경 (느린 스크롤, 계수 0.1)
+    // 1. 원경
     const bgOff = cameraX * 0.1;
     ctx.fillStyle = "rgba(75, 68, 58, 0.12)";
     ctx.beginPath();
@@ -27,7 +27,7 @@ export class SkylineEffect {
     ctx.closePath();
     ctx.fill();
 
-    // 2. 중경 (계수 0.4)
+    // 2. 중경
     const midOff = cameraX * 0.4;
     ctx.fillStyle = "rgba(45, 40, 34, 0.22)";
     ctx.beginPath();
@@ -40,7 +40,7 @@ export class SkylineEffect {
     ctx.closePath();
     ctx.fill();
 
-    // 3. 지면 및 전경 갈대밭 (월드 전체 x축 생성)
+    // 3. 지면 및 수묵 갈대밭
     ctx.strokeStyle = "#27221b";
     ctx.lineWidth = 4;
     ctx.beginPath();
