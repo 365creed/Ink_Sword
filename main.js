@@ -8,9 +8,10 @@ window.addEventListener('DOMContentLoaded', () => {
     engine.init();
     engine.start();
 
-    // 상단 3개 버튼 연동
+    // 상단 버튼 연동
     document.getElementById('pause-btn')?.addEventListener('click', () => engine.togglePause());
     document.getElementById('help-btn')?.addEventListener('click', () => engine.toggleHelp());
+    document.getElementById('clear-cache-btn')?.addEventListener('click', () => engine.clearCacheAndReload());
     document.getElementById('fullscreen-btn')?.addEventListener('click', () => engine.toggleFullscreen());
   }
 
