@@ -1,7 +1,6 @@
 export class InkEffect {
   constructor(ctx) {
     this.ctx = ctx;
-    // GC 부담을 없애기 위한 100개 파티클 풀 사전 할당
     this.poolSize = 100;
     this.particles = [];
     for (let i = 0; i < this.poolSize; i++) {
@@ -93,7 +92,7 @@ export class InkEffect {
     ctx.save();
 
     for (const st of this.stains) {
-      if (st.x + st.w < cameraX || st.x > cameraX + 1280) continue; // 컬링
+      if (st.x + st.w < cameraX || st.x > cameraX + 1280) continue;
       ctx.fillStyle = `rgba(20, 16, 12, ${st.alpha})`;
       ctx.beginPath();
       ctx.ellipse(st.x, st.y, st.w, st.h, 0, 0, Math.PI * 2);
@@ -103,7 +102,7 @@ export class InkEffect {
     for (let i = 0; i < this.poolSize; i++) {
       const p = this.particles[i];
       if (!p.active) continue;
-      if (p.x < cameraX - 50 || p.x > cameraX + 1330) continue; // 컬링
+      if (p.x < cameraX - 50 || p.x > cameraX + 1330) continue;
       const a = p.life / p.maxLife;
       ctx.fillStyle = `${p.color}${a})`;
       ctx.beginPath();
