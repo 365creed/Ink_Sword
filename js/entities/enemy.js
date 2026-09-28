@@ -1,3 +1,5 @@
+import { GameState } from '../core/state.js';
+
 export class Enemy {
   constructor(ctx, x, y, type = 'grunt') {
     this.ctx = ctx;
@@ -29,10 +31,21 @@ export class Enemy {
     }
   }
 
-  update(dt, player, ink, engine) {
+  update(dt, player, ink, engine, otherEnemies = []) {
     if (this.isDead) {
       this.deathTimer -= dt;
       return;
+    }
+
+    // 적 간 겹침 방지 (Separation Force)
+    for (const other of otherEnemies) {
+      if (other !== this && !other.isDead) {
+        const dx = this.x - other.x;
+        if (Math.abs(dx) < 45) {
+          const push = (45 - Math.abs(dx)) * 0.5 * (dx >= 0 ? 1 : -1);
+          this.x += push * dt * 6;
+        }
+      }
     }
 
     const dist = Math.abs(this.x - player.x);
@@ -43,19 +56,20 @@ export class Enemy {
       if (this.phaseTimer <= 0) {
         if (this.phase === 'windup') {
           this.phase = 'tell';
-          this.phaseTimer = 0.12;
+          this.phaseTimer = 0.12; // 2단계 패링 섬광 발생 (0.12초)
         } else if (this.phase === 'tell') {
           this.phase = 'swing';
           if (dist < (this.type === 'archer' ? 550 : 90)) {
             const res = player.takeDamage(this.dmg, ink, engine);
             if (res === 'parried') {
               this.phase = 'recovery';
-              this.phaseTimer = 0.6;
+              this.phaseTimer = 0.6; // 패링당하면 긴 그로기
             } else {
               this.phase = 'idle';
               this.atkCooldown = 2.0;
             }
           } else {
+            // 헛방 친 경우 칼이 바닥에 박힘 (0.4초 무방비)
             this.phase = 'recovery';
             this.phaseTimer = 0.4;
           }
@@ -65,6 +79,16 @@ export class Enemy {
         }
       }
       return;
+    }
+
+    // 결계 안전 마진(SAFE_MARGIN = 160) 준수
+    let enemyMaxX = GameState.worldWidth - 50;
+    if (GameState.activeBarrierX !== null) {
+      enemyMaxX = GameState.activeBarrierX - 160;
+    }
+    let enemyMinX = 30;
+    if (GameState.minBarrierX !== null) {
+      enemyMinX = GameState.minBarrierX + 60;
     }
 
     if (this.type === 'grunt') {
@@ -87,6 +111,8 @@ export class Enemy {
         this.phaseTimer = 0.25;
       }
     }
+
+    this.x = Math.max(enemyMinX, Math.min(enemyMaxX, this.x));
   }
 
   render(cameraX) {
@@ -135,13 +161,13 @@ export class Enemy {
       ctx.fill();
     }
 
-    // 백색 섬광 패링 텔레그래프 (★)
+    // 백색 섬광 패링 텔레그래프 (★ 직경 24px)
     if (this.phase === 'tell') {
       ctx.fillStyle = "#ffffff";
       ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 18;
       ctx.beginPath();
-      ctx.arc(0, -this.h - 15, 10, 0, Math.PI * 2);
+      ctx.arc(0, -this.h - 15, 12, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
