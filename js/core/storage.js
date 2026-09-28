@@ -1,7 +1,7 @@
 import { GameState } from './state.js';
 
 export const StorageManager = {
-  KEY: 'ink_sword_master_save_v8',
+  KEY: 'ink_sword_master_save_v9',
 
   save() {
     try {
@@ -13,6 +13,7 @@ export const StorageManager = {
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(this.KEY, JSON.stringify(data));
+      GameState.showToast("수묵 기록 완료 (저장됨)");
     } catch (e) {}
   },
 
