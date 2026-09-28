@@ -11,7 +11,7 @@ export class Boss {
 
     this.phase = 1;
     this.stateTimer = 2.0;
-    this.phaseStep = 'idle'; // idle, windup, tell, swing, recovery
+    this.phaseStep = 'idle';
     this.stepTimer = 0;
     this.speed = 135;
   }
@@ -40,7 +40,7 @@ export class Boss {
       if (this.stepTimer <= 0) {
         if (this.phaseStep === 'windup') {
           this.phaseStep = 'tell';
-          this.stepTimer = 0.14; // 거대 보스 패링 섬광
+          this.stepTimer = 0.14;
         } else if (this.phaseStep === 'tell') {
           this.phaseStep = 'swing';
           if (dist < 150) {
@@ -85,17 +85,14 @@ export class Boss {
     ctx.fillStyle = this.phaseStep === 'windup' ? "#6b1a1a" : "#14110e";
     ctx.fillRect(-this.w / 2, -this.h, this.w, this.h);
 
-    // 투구와 뿔
     ctx.fillStyle = "#8a1c1c";
     ctx.fillRect(-this.w / 2 + 10, -this.h - 22, 16, 22);
     ctx.fillRect(this.w / 2 - 26, -this.h - 22, 16, 22);
 
-    // 붉은 화염 안광
     ctx.fillStyle = "#ff2222";
     ctx.fillRect(-26, -this.h + 30, 16, 8);
     ctx.fillRect(10, -this.h + 30, 16, 8);
 
-    // 패링 섬광 (★)
     if (this.phaseStep === 'tell') {
       ctx.fillStyle = "#ffffff";
       ctx.shadowColor = "#ffffff";
