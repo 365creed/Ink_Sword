@@ -21,7 +21,7 @@ export class StageSystem {
     this.introTimer = 2.5;
 
     const stData = GameState.getCurrentStageData();
-    this.platforms = stData.platforms || [];
+    this.platforms = (stData && stData.platforms) ? stData.platforms : [];
 
     GameState.cameraX = 0;
     GameState.minBarrierX = null;
@@ -54,7 +54,7 @@ export class StageSystem {
 
     const px = this.engine.player.x;
 
-    // 2구역: 결계 봉쇄전 (X = 1450)
+    // 2구역: 묵계 결계 봉쇄전 (X = 1450)
     if (px >= 1350 && !this.barrier1Cleared) {
       GameState.activeBarrierX = 1450;
       GameState.minBarrierX = 900;
@@ -110,7 +110,9 @@ export class StageSystem {
     const s = String(sec % 60).padStart(2, '0');
     GameState.clearTimeStr = `${m}:${s}`;
     GameState.mode = 'STAGE_RESULT';
-    StorageManager.save();
+    if (StorageManager && typeof StorageManager.save === 'function') {
+      StorageManager.save();
+    }
   }
 
   nextStage() {
@@ -118,7 +120,7 @@ export class StageSystem {
       this.startStage(GameState.chapter, GameState.stage + 1);
     } else {
       const nextCh = GameState.chapter + 1;
-      if (CHAPTER_DATA[nextCh]) {
+      if (CHAPTER_DATA && CHAPTER_DATA[nextCh]) {
         this.startStage(nextCh, 1);
       } else {
         this.startStage(1, 1);
