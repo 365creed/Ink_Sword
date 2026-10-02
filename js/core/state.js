@@ -1,51 +1,93 @@
-// js/core/state.js
-const GameState = {
-  // 모드: 'TITLE', 'STAGE_INTRO', 'PLAYING', 'PAUSED', 'GAME_OVER', 'GAME_CLEAR'
-  state: 'TITLE',
-  
-  // 플레이 모드 분기: 'STORY' (일반) | 'SPEEDRUN' (스킵+기록경쟁)
-  gameMode: 'STORY',
-  
-  // 클리어 및 해금 여부
-  gameCleared: false,
-  speedRunnerUnlocked: false,
-  
-  // 진행도
-  currentChapter: 1,
-  currentStage: 1,
-  
-  // 시간 기록
-  speedRunTime: 0,     // 스피드런 총 누적 초
-  stageTime: 0,        // 현재 스테이지 진행 초
-  
-  // 카메라 및 아레나 락
-  isCameraLocked: false,
-  cameraLockX: 0,
+import { CHAPTER_DATA } from '../systems/stageData.js';
+
+export const GameState = {
+  mode: 'TITLE',
+
+  chapter: 1,
+  stage: 1,
+  worldWidth: 3800,
   cameraX: 0,
-  
-  init() {
-    const saved = StorageManager.load();
-    this.gameCleared = saved.gameCleared || false;
-    this.speedRunnerUnlocked = saved.speedRunnerUnlocked || false;
+  minBarrierX: null,
+  activeBarrierX: null,
+
+  isPaused: false,
+  isHelpOpen: false,
+  guideTimer: 5.0,
+  saveToastTimer: 0,
+  saveToastText: '',
+
+  tutorialCompleted: false,
+  bestRanks: {},
+
+  // 전투 스탯
+  hp: 100,
+  maxHp: 100,
+  ink: 60,
+  maxInk: 100,
+
+  combo: 0,
+  maxCombo: 0,
+  kills: 0,
+  parries: 0,
+  hitsTaken: 0,
+  stageStartTime: 0,
+  clearTimeStr: '00:00',
+
+  tutorialStep: 0,
+
+  // 록맨식 투사체 (검기 / 적 탄환)
+  projectiles: [],
+
+  addCombo() {
+    this.combo++;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
   },
 
-  resetRun(mode = 'STORY') {
-    this.gameMode = mode;
-    this.currentChapter = 1;
-    this.currentStage = 1;
-    this.speedRunTime = 0;
-    this.stageTime = 0;
-    this.isCameraLocked = false;
-    this.cameraLockX = 0;
+  resetCombo() {
+    this.combo = 0;
+  },
+
+  addInk(amount) {
+    this.ink = Math.min(this.maxInk, this.ink + amount);
+  },
+
+  useInk(amount) {
+    if (this.ink >= amount) {
+      this.ink -= amount;
+      return true;
+    }
+    return false;
+  },
+
+  showToast(msg) {
+    this.saveToastText = msg;
+    this.saveToastTimer = 1.6;
+  },
+
+  getCurrentChapterData() {
+    return CHAPTER_DATA[this.chapter] || CHAPTER_DATA[1];
+  },
+
+  getCurrentStageData() {
+    const ch = this.getCurrentChapterData();
+    return ch.stages[this.stage] || ch.stages[1];
+  },
+
+  resetForStage() {
+    this.hp = this.maxHp;
+    this.ink = 60;
+    this.combo = 0;
+    this.maxCombo = 0;
+    this.kills = 0;
+    this.parries = 0;
+    this.hitsTaken = 0;
     this.cameraX = 0;
-  },
-
-  lockCamera(lockX) {
-    this.isCameraLocked = true;
-    this.cameraLockX = lockX;
-  },
-
-  unlockCamera() {
-    this.isCameraLocked = false;
+    this.minBarrierX = null;
+    this.activeBarrierX = null;
+    this.projectiles = [];
+    this.isPaused = false;
+    this.isHelpOpen = false;
+    this.guideTimer = 5.0;
+    this.stageStartTime = Date.now();
   }
 };
