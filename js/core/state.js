@@ -19,7 +19,6 @@ export const GameState = {
   tutorialCompleted: false,
   bestRanks: {},
 
-  // 전투 스탯
   hp: 100,
   maxHp: 100,
   ink: 60,
@@ -34,8 +33,6 @@ export const GameState = {
   clearTimeStr: '00:00',
 
   tutorialStep: 0,
-
-  // 록맨식 투사체 (검기 파동 / 적 탄환)
   projectiles: [],
 
   addCombo() {
