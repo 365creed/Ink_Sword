@@ -2,59 +2,104 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>묵검 (墨劍) - 수묵 액션</title>
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>묵검 (墨劍) - 색을 잃은 한양</title>
   <link rel="stylesheet" href="style.css">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <div id="app-container">
-    <!-- 간결해진 상단 4버튼 헤더 -->
-    <div class="top-nav">
-      <button id="pause-btn" class="ink-btn">❚❚ 일시정지 (P)</button>
-      <button id="help-btn" class="ink-btn">? 조작법 (H)</button>
-      <button id="clear-cache-btn" class="ink-btn" style="color: #8a2420;">⚡ 캐시비우기 (C)</button>
-      <button id="fullscreen-btn" class="ink-btn">⛶ 전체화면 (F)</button>
+  <div id="game-container">
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+
+    <!-- 인게임 HUD (체력, 먹, 콤보, 스피드런 타이머) -->
+    <div id="hud-overlay" class="hidden">
+      <div class="hud-left">
+        <div class="bar-container hp-box">
+          <span class="hud-label">생명 (HP)</span>
+          <div class="bar-bg"><div id="hp-bar" class="bar-fill"></div></div>
+        </div>
+        <div class="bar-container ink-box">
+          <span class="hud-label">먹 (墨)</span>
+          <div class="bar-bg"><div id="ink-bar" class="bar-fill"></div></div>
+        </div>
+      </div>
+      <div class="hud-center">
+        <div id="combo-display" class="hidden"><span id="combo-count">0</span> 擊</div>
+      </div>
+      <div class="hud-right">
+        <div id="speedrun-timer" class="hidden">
+          <span class="timer-label">쾌속행 (RUN)</span>
+          <span id="speedrun-time-text">00:00.00</span>
+        </div>
+        <button id="pause-btn" class="hud-btn" title="일시정지 (ESC)">||</button>
+      </div>
     </div>
 
-    <canvas id="gameCanvas" width="1280" height="720"></canvas>
-
-    <div class="mobile-controls">
-      <div class="touch-group">
-        <button id="m-left" class="stamp-btn sub">◀</button>
-        <button id="m-right" class="stamp-btn sub">▶</button>
-        <button id="m-jump" class="stamp-btn sub">躍<span>도약</span></button>
+    <!-- 챕터/스테이지 전환 인트로 오버레이 (즉시 스킵 가능) -->
+    <div id="stage-intro-overlay" class="hidden">
+      <div class="intro-box">
+        <h2 id="intro-chapter-hanja">江西</h2>
+        <h3 id="intro-chapter-title">제 1 막 — 나루터의 안개</h3>
+        <p id="intro-desc">갈대숲을 가르고 서쪽 나루로 진입한다.</p>
+        <div class="skip-guide">[ Space / Enter / 터치 : 건너뛰기 ]</div>
       </div>
-      <div class="touch-group">
-        <button id="m-dash" class="stamp-btn sub">迅<span class="cost">-15</span></button>
-        <button id="m-parry" class="stamp-btn sub">返<span class="cost">패링</span></button>
-        <button id="m-heavy" class="stamp-btn">破<span class="cost">-20</span></button>
-        <button id="m-atk" class="stamp-btn">斬<span class="cost">기본</span></button>
-        <button id="m-sp" class="stamp-btn" style="background:#1a1714; border-color:#8a2020;">墨<span class="cost">100</span></button>
+    </div>
+
+    <!-- 일시정지 모달 -->
+    <div id="pause-modal" class="ink-modal hidden">
+      <div class="modal-content">
+        <h2>일 시 정 지</h2>
+        <div class="modal-menu">
+          <button id="resume-btn" class="ink-btn">계 속 하 기</button>
+          <button id="restart-btn" class="ink-btn">다 시 도 전</button>
+          <button id="pause-controls-btn" class="ink-btn">조 작 법</button>
+          <button id="to-title-btn" class="ink-btn">처 음 으 로</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 조작법 안내 모달 (내부에 비밀 개발자 초기화 낙관 도장 배치) -->
+    <div id="controls-modal" class="ink-modal hidden">
+      <div class="modal-content">
+        <h2>조 작 법</h2>
+        <div class="key-guide">
+          <div class="guide-row"><span class="key">A / D</span><span class="desc">좌우 걷기 / 달리기</span></div>
+          <div class="guide-row"><span class="key">Space / W</span><span class="desc">일반 점프 (장애물/투사체 회피)</span></div>
+          <div class="guide-row"><span class="key">L + Space</span><span class="desc"><b>대시 점프</b> (장거리 고속 도약)</span></div>
+          <div class="guide-row"><span class="key">J</span><span class="desc">기본 참격</span></div>
+          <div class="guide-row"><span class="key">공중 ↓ + J</span><span class="desc"><b>급강하 하향 베기</b> (방패 파괴 및 광역 다운)</span></div>
+          <div class="guide-row"><span class="key">K</span><span class="desc">강공격 (묵 20 소모 / 가드 브레이크)</span></div>
+          <div class="guide-row"><span class="key">L</span><span class="desc">대시 (무적 회피)</span></div>
+          <div class="guide-row"><span class="key">I</span><span class="desc">패링 (적 공격 튕겨내기 / 먹 보충)</span></div>
+        </div>
+
+        <!-- 숨겨진 개발자 초기화 도장 (낙관: 3회 연속 클릭 시 초기화) -->
+        <div class="seal-container">
+          <div id="secret-dev-seal" class="ink-seal" title="落款">
+            <span>墨</span>
+          </div>
+        </div>
+
+        <button id="close-controls-btn" class="ink-btn">닫 기</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="main.js"></script>
-
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        try {
-          const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-          reg.update();
-          let refreshing = false;
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
-              refreshing = true;
-              window.location.reload();
-            }
-          });
-        } catch (err) {}
-      });
-    }
-  </script>
+  <!-- 핵심 게임 스크립트 종속성 순서 로드 -->
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/state.js"></script>
+  <script src="js/core/sound.js"></script>
+  <script src="js/core/engine.js"></script>
+  <script src="js/effects/ink.js"></script>
+  <script src="js/effects/brush.js"></script>
+  <script src="js/effects/skyline.js"></script>
+  <script src="js/entities/player.js"></script>
+  <script src="js/entities/enemy.js"></script>
+  <script src="js/entities/boss.js"></script>
+  <script src="js/systems/stageData.js"></script>
+  <script src="js/systems/stage.js"></script>
+  <script src="js/systems/chapter.js"></script>
+  <script src="js/systems/story.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
