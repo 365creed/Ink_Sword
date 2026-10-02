@@ -118,10 +118,9 @@ export class Engine {
         return;
       }
 
-      // 조작 키
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.input.left = true;
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.input.right = true;
-      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') this.player.jump();
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.player.jump();
 
       if (e.key === 'j' || e.key === 'J') this.player.attack(this.brush, this.ink, this.enemies, this.boss);
       if (e.key === 'k' || e.key === 'K') this.player.startCharge();
@@ -133,7 +132,7 @@ export class Engine {
     window.addEventListener('keyup', (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.input.left = false;
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.input.right = false;
-      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') this.player.cutJump();
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.player.cutJump();
       if (e.key === 'k' || e.key === 'K') this.player.releaseCharge(this.brush, this.ink, this.enemies, this.boss);
     });
 
@@ -163,14 +162,16 @@ export class Engine {
 
   handleClick(x, y) {
     if (GameState.isPaused) {
-      if (x > 490 && x < 790 && y > 360 && y < 410) this.togglePause();
-      else if (x > 490 && x < 790 && y > 420 && y < 470) this.manualSave();
-      else if (x > 490 && x < 790 && y > 480 && y < 530) {
+      if (x > 490 && x < 790 && y > 320 && y < 370) this.togglePause();
+      else if (x > 490 && x < 790 && y > 380 && y < 430) this.manualSave();
+      else if (x > 490 && x < 790 && y > 440 && y < 490) {
         GameState.isPaused = false;
         this.stageSystem.startStage(GameState.chapter, GameState.stage);
-      } else if (x > 490 && x < 790 && y > 540 && y < 590) {
+      } else if (x > 490 && x < 790 && y > 500 && y < 550) {
         GameState.isPaused = false;
         GameState.mode = 'TITLE';
+      } else if (x > 490 && x < 790 && y > 560 && y < 610) {
+        this.clearCacheAndReload();
       }
       return;
     }
@@ -250,7 +251,8 @@ export class Engine {
     this.ink.update(dt);
 
     if (GameState.mode === 'PLAYING') {
-      this.player.update(dt, this.input, this.stageSystem.platforms);
+      const plats = (this.stageSystem && this.stageSystem.platforms) ? this.stageSystem.platforms : [];
+      this.player.update(dt, this.input, plats);
 
       const targetCamX = this.player.x - 450;
       const maxCamX = GameState.worldWidth - this.width;
@@ -258,7 +260,7 @@ export class Engine {
 
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const e = this.enemies[i];
-        e.update(dt, this.player, this.ink, this, this.enemies, this.stageSystem.platforms);
+        e.update(dt, this.player, this.ink, this, this.enemies, plats);
         if (e.isDead && e.deathTimer <= 0) {
           GameState.kills++;
           this.enemies.splice(i, 1);
@@ -267,9 +269,10 @@ export class Engine {
 
       if (this.boss) this.boss.update(dt, this.player, this.ink, this);
 
-      // 투사체 안전 업데이트 (역순 순회로 splice 에러 차단)
-      for (let i = GameState.projectiles.length - 1; i >= 0; i--) {
-        const p = GameState.projectiles[i];
+      // 투사체 안전 업데이트
+      const projs = GameState.projectiles || [];
+      for (let i = projs.length - 1; i >= 0; i--) {
+        const p = projs[i];
         if (!p) continue;
         p.x += p.vx * dt;
         p.life -= dt;
@@ -293,7 +296,7 @@ export class Engine {
           }
         }
 
-        if (p.life <= 0) GameState.projectiles.splice(i, 1);
+        if (p.life <= 0) projs.splice(i, 1);
       }
 
       this.stageSystem.update(dt);
@@ -320,10 +323,11 @@ export class Engine {
     this.skyline.render(GameState.cameraX, GameState.chapter, GameState.worldWidth);
 
     // 공중 수묵 발판 렌더링
+    const plats = (this.stageSystem && this.stageSystem.platforms) ? this.stageSystem.platforms : [];
     ctx.fillStyle = "#3a332a";
     ctx.strokeStyle = "#1b1713";
     ctx.lineWidth = 3;
-    for (const plat of this.stageSystem.platforms) {
+    for (const plat of plats) {
       if (plat.x + plat.w < GameState.cameraX - 50 || plat.x > GameState.cameraX + 1330) continue;
       ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
       ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
@@ -331,7 +335,6 @@ export class Engine {
       ctx.fillRect(plat.x + 2, plat.y + 2, plat.w - 4, 4);
     }
 
-    // 결계 묵선
     if (GameState.activeBarrierX !== null) {
       ctx.fillStyle = "rgba(22, 18, 14, 0.85)";
       ctx.fillRect(GameState.activeBarrierX - 10, 0, 20, 620);
@@ -347,8 +350,9 @@ export class Engine {
       ctx.strokeRect(GameState.minBarrierX - 10, 0, 20, 620);
     }
 
-    // 투사체 (차지 검기 / 적 탄환)
-    for (const p of GameState.projectiles) {
+    // 투사체 (검기 파동 / 적 탄환)
+    const projs = GameState.projectiles || [];
+    for (const p of projs) {
       ctx.save();
       if (p.isPlayer) {
         ctx.fillStyle = "#1c1813";
@@ -509,35 +513,30 @@ export class Engine {
     ctx.textAlign = "left";
     ctx.fillText(`${ch.hanja} · 제 ${GameState.stage} 막`, 40, 45);
 
-    // HP (白)
     ctx.fillText("白", 40, 78);
     ctx.fillStyle = "#d5cebe";
     ctx.fillRect(68, 65, 160, 14);
     ctx.fillStyle = "#8a2420";
     ctx.fillRect(68, 65, (GameState.hp / GameState.maxHp) * 160, 14);
 
-    // 墨
     ctx.fillText("墨", 40, 108);
     ctx.fillStyle = "#d5cebe";
     ctx.fillRect(68, 95, 160, 14);
     ctx.fillStyle = GameState.ink >= 100 ? "#8a2420" : "#1e1a16";
     ctx.fillRect(68, 95, (GameState.ink / GameState.maxInk) * 160, 14);
 
-    // 콤보
     if (GameState.combo > 1) {
       ctx.fillStyle = "#8a2420";
       ctx.font = "bold 26px 'Noto Serif KR', serif";
       ctx.fillText(`${GameState.combo} 斬!`, 40, 150);
     }
 
-    // 미니 진행도
     const prog = Math.min(1.0, this.player.x / GameState.worldWidth);
     ctx.fillStyle = "#d5cebe";
     ctx.fillRect(540, 25, 200, 6);
     ctx.fillStyle = "#1e1a16";
     ctx.fillRect(540, 25, 200 * prog, 6);
 
-    // 키 가이드
     if (GameState.guideTimer > 0) {
       const alpha = Math.min(1.0, GameState.guideTimer);
       ctx.save();
