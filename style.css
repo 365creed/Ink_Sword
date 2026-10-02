@@ -1,123 +1,302 @@
 * {
-  box-sizing: border-box;
   margin: 0;
   padding: 0;
-}
-
-body, html {
-  width: 100%;
-  height: 100%;
-  background-color: #dcd6c8;
-  color: #24201b;
-  font-family: 'Noto Serif KR', 'Batang', 'AppleMyungjo', 'Song Myung', serif;
-  overflow: hidden;
+  box-sizing: border-box;
   user-select: none;
   -webkit-user-select: none;
 }
 
-#app-container {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+body {
+  background-color: #121214;
+  color: #2b2b2b;
+  font-family: 'Batang', 'Apple Gothic', 'Malgun Gothic', serif;
+  overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(circle, #f5f2e8 0%, #cdc5b3 100%);
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+  min-height: 100vh;
 }
 
-canvas {
+#game-container {
+  position: relative;
+  width: 800px;
+  height: 450px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85);
+  background: #f4f1ea;
+  overflow: hidden;
+}
+
+#gameCanvas {
+  display: block;
   width: 100%;
-  max-width: 1280px;
-  height: auto;
-  aspect-ratio: 16 / 9;
-  box-shadow: 0 14px 45px rgba(25, 20, 15, 0.35);
-  border: 2px solid #332d25;
-  background-color: #f7f4eb;
-  touch-action: none;
+  height: 100%;
+  background: transparent;
 }
 
-/* 상단 3버튼 헤더 */
-.top-nav {
+/* UI 오버레이 */
+.hidden {
+  display: none !important;
+}
+
+#hud-overlay {
   position: absolute;
-  top: 15px;
-  right: 20px;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 12px 18px;
   display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.hud-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bar-container {
+  display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.hud-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #222;
+  width: 48px;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.bar-bg {
+  width: 140px;
+  height: 10px;
+  background: rgba(40, 40, 40, 0.2);
+  border: 1px solid #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 100%;
+  transition: width 0.15s ease-out;
+}
+
+#hp-bar {
+  background: #8b1e1e;
+}
+
+#ink-bar {
+  background: #111111;
+}
+
+.hud-center {
+  margin-top: 5px;
+}
+
+#combo-display {
+  font-size: 20px;
+  font-weight: 900;
+  color: #1a1a1a;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+
+.hud-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+#speedrun-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: rgba(244, 241, 234, 0.85);
+  padding: 4px 8px;
+  border: 1px solid #333;
+  border-radius: 3px;
+}
+
+.timer-label {
+  font-size: 9px;
+  font-weight: bold;
+  color: #8b1e1e;
+}
+
+#speedrun-time-text {
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #111;
+}
+
+.hud-btn {
+  background: #111;
+  color: #f4f1ea;
+  border: 1px solid #333;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+/* 챕터 전환 인트로 오버레이 */
+#stage-intro-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(244, 241, 234, 0.94);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  z-index: 50;
+  cursor: pointer;
+}
+
+.intro-box h2 {
+  font-size: 54px;
+  color: #111;
+  margin-bottom: 4px;
+  letter-spacing: 6px;
+}
+
+.intro-box h3 {
+  font-size: 20px;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.intro-box p {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 24px;
+}
+
+.skip-guide {
+  font-size: 12px;
+  color: #8b1e1e;
+  letter-spacing: 1px;
+  animation: pulseGuide 1.4s infinite alternate;
+}
+
+@keyframes pulseGuide {
+  from { opacity: 0.4; }
+  to { opacity: 1.0; }
+}
+
+/* 모달 스타일 */
+.ink-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(18, 18, 20, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
   z-index: 100;
 }
 
+.modal-content {
+  background: #f7f5ee;
+  border: 2px solid #1a1a1a;
+  padding: 24px 30px;
+  width: 440px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  position: relative;
+}
+
+.modal-content h2 {
+  font-size: 22px;
+  color: #111;
+  margin-bottom: 16px;
+  letter-spacing: 4px;
+}
+
+.modal-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .ink-btn {
-  background: rgba(247, 244, 235, 0.95);
-  color: #24201b;
-  border: 1px solid #5a5144;
-  padding: 6px 12px;
-  font-family: inherit;
+  background: #1a1a1a;
+  color: #f4f1ea;
+  border: none;
+  padding: 10px 0;
   font-size: 13px;
-  font-weight: 700;
+  letter-spacing: 2px;
   cursor: pointer;
-  border-radius: 2px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   transition: all 0.2s;
+  font-family: inherit;
 }
 
 .ink-btn:hover {
-  background: #24201b;
-  color: #f7f4eb;
+  background: #333;
+  transform: translateY(-1px);
 }
 
-/* 모바일 수묵 도장 패드 */
-.mobile-controls {
-  display: none;
-  position: absolute;
-  bottom: 18px;
-  width: 100%;
-  padding: 0 20px;
-  justify-content: space-between;
-  pointer-events: none;
-  z-index: 99;
-  opacity: 0.88;
-}
-
-@media (pointer: coarse) {
-  .mobile-controls { display: flex; }
-}
-
-.touch-group {
-  display: flex;
-  gap: 8px;
-  pointer-events: auto;
-  align-items: flex-end;
-}
-
-.stamp-btn {
-  width: 52px;
-  height: 52px;
-  background: #8b2522;
-  color: #f7f4eb;
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: bold;
-  border: 2px solid #541412;
-  border-radius: 4px;
+.key-guide {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.guide-row {
+  display: flex;
+  align-items: center;
+}
+
+.key {
+  width: 90px;
+  font-weight: bold;
+  color: #8b1e1e;
+}
+
+.desc {
+  color: #333;
+}
+
+/* 숨겨진 개발자 낙관 도장 */
+.seal-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.ink-seal {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #8b1e1e;
+  background: rgba(139, 30, 30, 0.06);
+  color: #8b1e1e;
+  font-weight: 900;
+  font-size: 14px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
   cursor: pointer;
+  opacity: 0.35;
+  transition: all 0.2s;
+  border-radius: 2px;
 }
 
-.stamp-btn.sub {
-  background: #2c2722;
-  border-color: #15120f;
-}
-
-.stamp-btn span.cost {
-  font-size: 9px;
-  font-weight: normal;
-  opacity: 0.85;
+.ink-seal:hover {
+  opacity: 0.9;
+  transform: scale(1.1);
+  background: rgba(139, 30, 30, 0.2);
 }
