@@ -112,3 +112,5 @@ export class InkEffect {
     ctx.restore();
   }
 }
+
+export default InkEffect;
