@@ -57,3 +57,5 @@ export class BrushEffect {
     ctx.restore();
   }
 }
+
+export default BrushEffect;
