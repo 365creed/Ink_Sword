@@ -1,195 +1,139 @@
-// js/systems/stage.js
-class StageManager {
-  constructor() {
+import { CHAPTER_DATA } from './stageData.js';
+import { Enemy } from '../entities/enemy.js';
+import { Boss } from '../entities/boss.js';
+import { GameState } from '../core/state.js';
+import { StorageManager } from '../core/storage.js';
+
+export class StageSystem {
+  constructor(engine) {
+    this.engine = engine;
     this.introTimer = 0;
-    this.isIntro = false;
-    this.arenas = [];
-    this.currentArena = null;
-    this.projectiles = [];
-    this.enemies = [];
+    this.barrier1Cleared = false;
+    this.bossSpawned = false;
+    this.platforms = [];
   }
 
-  initStage(chapter, stageNum) {
-    GameState.currentChapter = chapter;
-    GameState.currentStage = stageNum;
-    this.projectiles = [];
-    this.enemies = [];
+  startStage(chapter, stage) {
+    GameState.chapter = chapter;
+    GameState.stage = stage;
+    GameState.resetForStage();
+    GameState.mode = 'STAGE_INTRO';
+    this.introTimer = 2.5;
 
-    // 스피드런 모드일 경우 인트로 생략
-    if (GameState.gameMode === 'SPEEDRUN') {
-      this.isIntro = false;
-      this.introTimer = 0;
-      document.getElementById('stage-intro-overlay').classList.add('hidden');
-      GameState.state = 'PLAYING';
-    } else {
-      this.isIntro = true;
-      this.introTimer = 2.5;
-      this.showIntroUI();
-      GameState.state = 'STAGE_INTRO';
-    }
+    // 현재 스테이지 발판 목록 주입
+    const stData = GameState.getCurrentStageData();
+    this.platforms = stData.platforms || [];
 
-    this.setupArenas(chapter, stageNum);
+    GameState.cameraX = 0;
+    GameState.minBarrierX = null;
+    GameState.activeBarrierX = null;
+    this.barrier1Cleared = false;
+    this.bossSpawned = false;
+
+    this.engine.enemies = [];
+    this.engine.boss = null;
+    this.engine.player.x = 200;
+    this.engine.player.y = 524;
+    this.engine.player.vx = 0;
+    this.engine.player.vy = 0;
+
+    // 1구역 탐색로 적
+    this.engine.enemies.push(new Enemy(this.engine.ctx, 750, 528, 'grunt'));
+    this.engine.enemies.push(new Enemy(this.engine.ctx, 1100, 528, 'grunt'));
   }
 
-  showIntroUI() {
-    const overlay = document.getElementById('stage-intro-overlay');
-    const hanjaEl = document.getElementById('intro-chapter-hanja');
-    const titleEl = document.getElementById('intro-chapter-title');
-    
-    const hanjaMap = { 1: '江西', 2: '江北', 3: '江東', 4: '江南', 5: '漢陽宮' };
-    hanjaEl.innerText = hanjaMap[GameState.currentChapter] || '江西';
-    titleEl.innerText = `제 ${GameState.currentChapter} 막 — ${GameState.currentStage} 장`;
-    overlay.classList.remove('hidden');
-  }
-
-  // 즉시 스킵 트리거 (Space, Enter, 터치 클릭)
-  skipIntro() {
-    if (this.isIntro) {
-      this.isIntro = false;
-      this.introTimer = 0;
-      document.getElementById('stage-intro-overlay').classList.add('hidden');
-      GameState.state = 'PLAYING';
-    }
-  }
-
-  setupArenas(chapter, stageNum) {
-    this.arenas = [
-      {
-        triggerX: 950,
-        minX: 750,
-        maxX: 1350,
-        camLockX: 850,
-        state: 'INACTIVE',
-        gateH: 0,
-        enemies: [
-          new Enemy(1150, 326, chapter === 2 ? 'shield' : 'grunt', chapter),
-          new Enemy(1250, 326, chapter === 1 ? 'ronin' : 'arquebus', chapter)
-        ]
-      },
-      {
-        triggerX: 2100,
-        minX: 1900,
-        maxX: 2500,
-        camLockX: 2000,
-        state: 'INACTIVE',
-        gateH: 0,
-        enemies: [
-          new Enemy(2280, 326, chapter === 4 ? 'twin_blade' : 'shield', chapter),
-          new Enemy(2380, 326, 'arquebus', chapter),
-          new Enemy(2440, 326, 'grunt', chapter)
-        ]
-      }
-    ];
-  }
-
-  addProjectile(proj) {
-    this.projectiles.push(proj);
-  }
-
-  update(dt, player) {
-    // 인트로 대기 시간 카운트다운
-    if (this.isIntro) {
+  update(dt) {
+    if (GameState.mode === 'STAGE_INTRO') {
       this.introTimer -= dt;
       if (this.introTimer <= 0) {
-        this.skipIntro();
+        GameState.mode = 'PLAYING';
+        this.engine.sound.playDrum();
       }
       return;
     }
 
-    // 스피드런 타이머 누적
-    if (GameState.state === 'PLAYING') {
-      GameState.speedRunTime += dt;
-      GameState.stageTime += dt;
-    }
+    if (GameState.mode !== 'PLAYING') return;
 
-    // 록맨식 아레나 게이트 & 카메라 락 루프
-    this.updateArenas(dt, player);
+    const px = this.engine.player.x;
 
-    // 투사체 처리
-    for (let i = this.projectiles.length - 1; i >= 0; i--) {
-      const p = this.projectiles[i];
-      p.x += p.vx * dt;
+    // 2구역: 묵계 결계 봉쇄 (X = 1450)
+    if (px >= 1350 && !this.barrier1Cleared) {
+      GameState.activeBarrierX = 1450;
+      GameState.minBarrierX = 900;
 
-      // 플레이어 피격 검사
-      if (Math.abs(p.x - player.x) < 25 && Math.abs(p.y - player.y) < 35) {
-        player.takeDamage(p.damage, p.x);
-        this.projectiles.splice(i, 1);
-        continue;
-      }
-
-      // 화면 이탈
-      if (Math.abs(p.x - player.x) > 600) {
-        this.projectiles.splice(i, 1);
+      if (this.engine.enemies.filter(e => !e.isDead).length === 0) {
+        this.engine.enemies.push(new Enemy(this.engine.ctx, 1050, 528, 'archer'));
+        this.engine.enemies.push(new Enemy(this.engine.ctx, 1180, 534, 'rusher'));
+        this.barrier1Cleared = true;
       }
     }
-  }
 
-  updateArenas(dt, player) {
-    for (const arena of this.arenas) {
-      // 1. 트리거 진입: 카메라 고정 및 문 하강 시작
-      if (arena.state === 'INACTIVE' && player.x >= arena.triggerX) {
-        arena.state = 'CLOSING';
-        GameState.lockCamera(arena.camLockX);
-        SoundManager.play('gate_slam');
+    if (this.barrier1Cleared && GameState.activeBarrierX === 1450) {
+      if (this.engine.enemies.filter(e => !e.isDead).length === 0) {
+        GameState.activeBarrierX = null;
+        GameState.minBarrierX = null;
+        this.engine.sound.playDrum();
       }
+    }
 
-      // 2. 문 닫히는 중
-      if (arena.state === 'CLOSING') {
-        arena.gateH = Math.min(300, arena.gateH + 900 * dt);
-        if (arena.gateH >= 300) {
-          arena.state = 'LOCKED';
-          this.enemies.push(...arena.enemies);
-        }
+    // 3구역: 먹 샘터 회복 (X = 2050 ~ 2200)
+    if (px > 2050 && px < 2200) {
+      GameState.hp = Math.min(GameState.maxHp, GameState.hp + 22 * dt);
+      GameState.ink = Math.min(GameState.maxInk, GameState.ink + 35 * dt);
+    }
+
+    // 4구역: 록맨식 보스 룸 아레나 (X = 2750)
+    if (px >= 2750 && !this.bossSpawned) {
+      this.bossSpawned = true;
+      GameState.activeBarrierX = 3700;
+      GameState.minBarrierX = 2650;
+      this.engine.sound.playDrum();
+
+      if (GameState.stage === 3) {
+        this.engine.boss = new Boss(this.engine.ctx, 3350, 470);
+      } else {
+        this.engine.enemies.push(new Enemy(this.engine.ctx, 3100, 534, 'rusher'));
+        this.engine.enemies.push(new Enemy(this.engine.ctx, 3300, 528, 'archer'));
       }
+    }
 
-      // 3. 전투 중: 플레이어 공간 가둠 및 전멸 확인
-      if (arena.state === 'LOCKED') {
-        player.x = Math.max(arena.minX + 25, Math.min(arena.maxX - 25, player.x));
-        const aliveEnemies = this.enemies.filter(e => !e.isDead);
-        
-        if (aliveEnemies.length === 0) {
-          arena.state = 'OPENING';
-          SoundManager.play('gate_open');
-          EffectManager.addCalligraphyText(arena.camLockX + 400, 180, '破');
-        }
-      }
-
-      // 4. 문 열리는 중: 카메라 락 해제
-      if (arena.state === 'OPENING') {
-        arena.gateH = Math.max(0, arena.gateH - 600 * dt);
-        if (arena.gateH <= 0) {
-          arena.state = 'CLEARED';
-          GameState.unlockCamera();
-        }
+    if (this.bossSpawned) {
+      const activeEnemies = this.engine.enemies.filter(e => !e.isDead).length;
+      const bossDead = !this.engine.boss || this.engine.boss.isDead;
+      if (activeEnemies === 0 && bossDead) {
+        this.finishStage();
       }
     }
   }
 
-  render(ctx) {
-    // 록맨식 아레나 셔터 게이트 렌더링
-    for (const arena of this.arenas) {
-      if (arena.gateH > 0) {
-        ctx.save();
-        ctx.fillStyle = '#111215';
-        ctx.strokeStyle = '#444';
-        ctx.lineWidth = 3;
+  finishStage() {
+    const sec = Math.floor((Date.now() - GameState.stageStartTime) / 1000);
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    GameState.clearTimeStr = `${m}:${s}`;
+    GameState.mode = 'STAGE_RESULT';
+    StorageManager.save();
+  }
 
-        // 좌측 결계 문
-        ctx.fillRect(arena.minX - 15, 380 - arena.gateH, 24, arena.gateH);
-        ctx.strokeRect(arena.minX - 15, 380 - arena.gateH, 24, arena.gateH);
-
-        // 우측 결계 문
-        ctx.fillRect(arena.maxX - 9, 380 - arena.gateH, 24, arena.gateH);
-        ctx.strokeRect(arena.maxX - 9, 380 - arena.gateH, 24, arena.gateH);
-
-        ctx.restore();
+  nextStage() {
+    if (GameState.stage < 3) {
+      this.startStage(GameState.chapter, GameState.stage + 1);
+    } else {
+      const nextCh = GameState.chapter + 1;
+      if (CHAPTER_DATA[nextCh]) {
+        this.startStage(nextCh, 1);
+      } else {
+        this.startStage(1, 1);
       }
     }
+  }
 
-    // 투사체 렌더링
-    ctx.fillStyle = '#8b1e1e';
-    for (const p of this.projectiles) {
-      ctx.fillRect(p.x - 4, p.y - 2, 8, 4);
-    }
+  calculateRank() {
+    let score = GameState.parries * 320 + GameState.maxCombo * 120 - GameState.hitsTaken * 160;
+    if (GameState.hitsTaken === 0) return 'SS';
+    if (score > 1500) return 'S';
+    if (score > 850) return 'A';
+    if (score > 350) return 'B';
+    return 'C';
   }
 }
