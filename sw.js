@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ink-sword-cache';
+const CACHE_NAME = 'ink-sword-cache-v12';
 const ASSETS = [
   './index.html',
   './style.css',
@@ -15,6 +15,7 @@ const ASSETS = [
   './js/entities/enemy.js',
   './js/entities/boss.js',
   './js/systems/stage.js',
+  './js/systems/stageData.js',
   './assets/images/player.png'
 ];
 
@@ -24,7 +25,12 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    caches.keys().then((keys) => Promise.all(
+      keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null))
+    ))
+  );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
@@ -38,6 +44,15 @@ self.addEventListener('fetch', (e) => {
         }
         return netRes;
       })
-      .catch(() => caches.match(e.request).then((cached) => cached || caches.match('./index.html')))
+      .catch(() => {
+        return caches.match(e.request).then((cached) => {
+          if (cached) return cached;
+          // 오직 페이지 이동(HTML 네비게이션)일 때만 index.html 반환 (JS 파일 문법 에러 원천 차단)
+          if (e.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+          return null;
+        });
+      })
   );
 });
