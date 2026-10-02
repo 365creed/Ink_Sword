@@ -22,7 +22,7 @@ export class Enemy {
     this.deathTimer = 0.35;
     this.atkCooldown = Math.random() * 1.5 + 1.2;
 
-    this.phase = 'idle'; // idle, windup, tell, swing, recovery
+    this.phase = 'idle';
     this.phaseTimer = 0;
   }
 
@@ -40,7 +40,7 @@ export class Enemy {
       return;
     }
 
-    // 적 간 겹침 방지
+    // 적 간 겹침 방지 (Separation)
     for (const other of otherEnemies) {
       if (other !== this && !other.isDead) {
         const dx = this.x - other.x;
@@ -53,17 +53,15 @@ export class Enemy {
     const dist = Math.abs(this.x - player.x);
     this.atkCooldown -= dt;
 
-    // 공격 전조 상태 머신
     if (this.phaseTimer > 0) {
       this.phaseTimer -= dt;
       if (this.phaseTimer <= 0) {
         if (this.phase === 'windup') {
           this.phase = 'tell';
-          this.phaseTimer = 0.12; // 백색 섬광 패링 찰나
+          this.phaseTimer = 0.12;
         } else if (this.phase === 'tell') {
           this.phase = 'swing';
           if (this.type === 'archer') {
-            // 록맨 스타일: 궁수가 먹빛 화살 투사체 발사
             const dir = player.x > this.x ? 1 : -1;
             GameState.projectiles.push({
               x: this.x + (dir > 0 ? this.w + 10 : -10),
@@ -99,7 +97,7 @@ export class Enemy {
       return;
     }
 
-    // 결계 안전 마진 준수
+    // 결계 안전 마진(160px) 준수
     let enemyMaxX = GameState.worldWidth - 50;
     if (GameState.activeBarrierX !== null) enemyMaxX = GameState.activeBarrierX - 160;
     let enemyMinX = 30;
@@ -118,7 +116,6 @@ export class Enemy {
         this.phaseTimer = 0.4;
       }
     } else {
-      // 도깨비: 록맨 스타일 점프 돌진
       this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
       if (dist < 80 && this.atkCooldown <= 0) {
         this.phase = 'windup';
@@ -128,7 +125,7 @@ export class Enemy {
 
     this.x = Math.max(enemyMinX, Math.min(enemyMaxX, this.x));
 
-    // 플랫폼 충돌 검사
+    // 발판 착지 검사
     this.vy += 1300 * dt;
     this.y += this.vy * dt;
     this.isGrounded = false;
@@ -200,7 +197,6 @@ export class Enemy {
       ctx.fill();
     }
 
-    // 백색 섬광 패링 텔레그래프
     if (this.phase === 'tell') {
       ctx.fillStyle = "#ffffff";
       ctx.shadowColor = "#ffffff";
