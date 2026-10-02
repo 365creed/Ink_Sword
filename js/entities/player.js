@@ -16,14 +16,17 @@ export class Player {
     this.vy = 0;
     this.facing = 1;
     this.isGrounded = false;
+    this.isWallSliding = false;
 
-    // 록맨식 차지(기 모으기) & 대시 물리
+    // 록맨식 차지 & 대시 & 콤보
     this.chargeTimer = 0;
     this.isCharging = false;
     this.isDashing = false;
     this.dashTimer = 0;
+    this.comboStep = 0;
+    this.comboResetTimer = 0;
 
-    // 2.5D 모션 및 외형
+    // 2.5D 모션 및 원화 모사 변수
     this.scaleX = 1.0;
     this.scaleY = 1.0;
     this.tilt = 0;
@@ -32,7 +35,7 @@ export class Player {
     this.parryFlashText = 0;
     this.invincibleTimer = 0;
 
-    this.state = 'idle'; // idle, run, jump, attack, heavy, dash, parry, hurt
+    this.state = 'idle'; // idle, run, attack, dash, parry, hurt
     this.stateTimer = 0;
     this.dashGhosts = [];
 
@@ -42,76 +45,90 @@ export class Player {
     this.img.src = 'assets/images/player.png';
   }
 
-  // 1. 기본 참격 (지상 3연타 및 공중 회전베기)
+  // 1. 록맨 제로식 3단 연속 베기 콤보
   attack(brush, ink, enemies, boss) {
     if (this.isDashing || this.state === 'parry') return;
+
+    this.comboStep = (this.comboStep % 3) + 1;
+    this.comboResetTimer = 0.6;
     this.state = 'attack';
     this.stateTimer = 0.22;
     this.sound.playSlash();
 
-    this.tilt = this.facing * 0.22;
-    this.swordAngle = -0.85;
-    this.scaleX = 1.25;
-    this.scaleY = 0.85;
-
     const atkX = this.x + (this.facing > 0 ? this.hitW + 40 : -40);
     const atkY = this.y + this.hitH / 2;
-    brush.addSlash(atkX, atkY, this.facing, 'normal');
-    this.checkHit(atkX, atkY, 105, 28, ink, enemies, boss, false);
+
+    if (this.comboStep === 1) {
+      this.tilt = this.facing * 0.18;
+      this.swordAngle = -0.7;
+      brush.addSlash(atkX, atkY, this.facing, 'normal');
+      this.checkHit(atkX, atkY, 95, 24, ink, enemies, boss, false);
+    } else if (this.comboStep === 2) {
+      this.tilt = this.facing * 0.26;
+      this.swordAngle = -1.2;
+      brush.addSlash(atkX, atkY - 15, this.facing, 'normal');
+      this.checkHit(atkX, atkY - 15, 105, 30, ink, enemies, boss, false);
+    } else {
+      // 3단 피니시: 공중 회전 수묵 섬광
+      this.tilt = this.facing * 0.35;
+      this.swordAngle = -1.8;
+      this.scaleX = 1.35;
+      brush.addSlash(atkX, atkY, this.facing, 'heavy');
+      this.checkHit(atkX, atkY, 130, 48, ink, enemies, boss, true);
+    }
   }
 
-  // 2. 록맨 차지샷: 묵빛 검기 파동 발사 (K 키)
+  // 2. 록맨 차지샷: 기 모아 묵빛 검기 파동 발사
   startCharge() {
     this.isCharging = true;
   }
 
   releaseCharge(brush, ink, enemies, boss) {
     if (!this.isCharging) return;
-    const charged = this.chargeTimer >= 1.0; // 1초 이상 모으면 풀차지
+    const isFull = this.chargeTimer >= 0.85;
     this.isCharging = false;
     this.chargeTimer = 0;
 
-    if (charged) {
+    if (isFull) {
       if (!GameState.useInk(20)) return;
       this.sound.playHeavySlash();
-      this.tilt = this.facing * 0.3;
-      this.swordAngle = -1.2;
+      this.tilt = this.facing * 0.32;
+      this.swordAngle = -1.4;
 
-      // 록맨식 거대 검기 투사체 생성
+      // 거대 관통 수묵 검기
       GameState.projectiles.push({
         x: this.x + (this.facing > 0 ? this.hitW + 20 : -30),
-        y: this.y + 35,
-        vx: this.facing * 850,
-        dmg: 65,
-        r: 32,
+        y: this.y + 36,
+        vx: this.facing * 880,
+        dmg: 70,
+        r: 34,
         isPlayer: true,
-        life: 2.0
+        life: 2.2
       });
       brush.addSlash(this.x + this.facing * 50, this.y + 40, this.facing, 'heavy');
     } else {
-      // 일반 강공격
       if (!GameState.useInk(10)) return;
       this.sound.playSlash();
       GameState.projectiles.push({
         x: this.x + (this.facing > 0 ? this.hitW + 15 : -25),
         y: this.y + 40,
-        vx: this.facing * 650,
+        vx: this.facing * 660,
         dmg: 35,
         r: 18,
         isPlayer: true,
-        life: 1.5
+        life: 1.6
       });
     }
   }
 
-  // 3. 록맨식 지상 슬라이딩 / 공중 에어 대시 (Shift / L)
+  // 3. 록맨식 지상 슬라이딩 / 에어 대시
   dash() {
     if (this.isDashing) return;
     if (!GameState.useInk(15)) return;
     this.isDashing = true;
     this.dashTimer = 0.28;
     this.sound.playDash();
-    this.vx = this.facing * 920;
+    this.vx = this.facing * 940;
 
     this.scaleX = 1.45;
     this.scaleY = 0.65;
@@ -123,7 +140,7 @@ export class Player {
     if (this.isDashing || this.state === 'parry') return;
     this.state = 'parry';
     this.stateTimer = 0.25;
-    this.swordAngle = -1.57; // 대도를 수직으로 꼿꼿이 세움
+    this.swordAngle = -1.57; // 대도를 수직 90도로 세움[cite: 8]
     this.scaleX = 0.85;
     this.scaleY = 1.22;
   }
@@ -186,19 +203,25 @@ export class Player {
     if (hitCount > 0) this.sound.playInkDrop();
   }
 
-  // 록맨식 가변 점프 (키를 짧게 누르면 낮게, 길게 누르면 높게)
   jump() {
     if (this.isGrounded) {
       this.vy = -620;
       this.isGrounded = false;
       this.scaleX = 0.8;
       this.scaleY = 1.25;
+    } else if (this.isWallSliding) {
+      // 록맨식 벽차기 점프(Wall Jump)
+      this.vy = -580;
+      this.vx = -this.facing * 440;
+      this.facing = -this.facing;
+      this.isWallSliding = false;
+      this.sound.playDash();
     }
   }
 
   cutJump() {
-    if (this.vy < -200) {
-      this.vy = -200; // 키를 떼면 상승 감속
+    if (this.vy < -220) {
+      this.vy = -220; // 가변 점프: 키를 떼면 즉시 상승 감속
     }
   }
 
@@ -207,20 +230,20 @@ export class Player {
     if (this.parryFlashText > 0) this.parryFlashText -= dt;
     if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
 
-    // 기 모으기 타이머
+    if (this.comboResetTimer > 0) {
+      this.comboResetTimer -= dt;
+      if (this.comboResetTimer <= 0) this.comboStep = 0;
+    }
+
     if (this.isCharging) {
       this.chargeTimer = Math.min(1.5, this.chargeTimer + dt);
     }
 
-    // 대시 타이머
     if (this.isDashing) {
       this.dashTimer -= dt;
-      if (this.dashTimer <= 0) {
-        this.isDashing = false;
-      }
+      if (this.dashTimer <= 0) this.isDashing = false;
     }
 
-    // 잔상 감쇠
     for (let i = this.dashGhosts.length - 1; i >= 0; i--) {
       this.dashGhosts[i].alpha -= dt * 3.5;
       if (this.dashGhosts[i].alpha <= 0) this.dashGhosts.splice(i, 1);
@@ -234,7 +257,6 @@ export class Player {
       }
     }
 
-    // 좌우 이동 (록맨식 즉각적인 반응성)
     if (!this.isDashing) {
       if (input.left) {
         this.vx = -340;
@@ -255,13 +277,12 @@ export class Player {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    // --- [핵심] 록맨식 플랫폼(발판) 충돌 판정 (상단 착지) ---
+    // --- [안전한 플랫폼 충돌 판정] ---
     this.isGrounded = false;
+    this.isWallSliding = false;
 
-    // 1. 공중 발판들 검사
     for (const plat of platforms) {
       const prevY = this.y - this.vy * dt;
-      // 발판 위에서 아래로 떨어질 때만 착지
       if (
         this.x + this.hitW > plat.x &&
         this.x < plat.x + plat.w &&
@@ -275,14 +296,34 @@ export class Player {
       }
     }
 
-    // 2. 최하단 바닥선 (Y = 620)
+    // 최하단 바닥선 (Y = 620)
     if (!this.isGrounded && this.y + this.hitH >= 620) {
       this.y = 620 - this.hitH;
       this.vy = 0;
       this.isGrounded = true;
     }
 
-    // 점프/낙하 시 스케일 탄성
+    // 결계 벽 및 월드 경계 제한 (벽타기 판정)
+    let minX = Math.max(30, GameState.cameraX);
+    if (GameState.minBarrierX !== null) minX = Math.max(minX, GameState.minBarrierX + 20);
+
+    let maxX = GameState.worldWidth - this.hitW - 30;
+    if (GameState.activeBarrierX !== null) maxX = Math.min(maxX, GameState.activeBarrierX - this.hitW - 10);
+
+    if (this.x <= minX) {
+      this.x = minX;
+      if (!this.isGrounded && this.vy > 0 && input.left) {
+        this.isWallSliding = true;
+        this.vy = 120; // 벽을 타고 천천히 미끄러짐
+      }
+    } else if (this.x >= maxX) {
+      this.x = maxX;
+      if (!this.isGrounded && this.vy > 0 && input.right) {
+        this.isWallSliding = true;
+        this.vy = 120;
+      }
+    }
+
     if (!this.isGrounded) {
       if (this.vy < 0) {
         this.scaleX = 0.88;
@@ -295,22 +336,12 @@ export class Player {
 
     this.scaleX += (1.0 - this.scaleX) * 0.15;
     this.scaleY += (1.0 - this.scaleY) * 0.15;
-
-    // 결계 벽 및 월드 경계 제한
-    let minX = Math.max(30, GameState.cameraX);
-    if (GameState.minBarrierX !== null) minX = Math.max(minX, GameState.minBarrierX + 20);
-
-    let maxX = GameState.worldWidth - this.hitW - 30;
-    if (GameState.activeBarrierX !== null) maxX = Math.min(maxX, GameState.activeBarrierX - this.hitW - 10);
-
-    this.x = Math.max(minX, Math.min(maxX, this.x));
   }
 
   render() {
     const ctx = this.ctx;
     ctx.save();
 
-    // 1. 록맨식 대시 갈필 잔상
     for (const g of this.dashGhosts) {
       ctx.save();
       ctx.translate(g.x + this.hitW / 2, g.y + this.hitH);
@@ -320,12 +351,12 @@ export class Player {
       ctx.restore();
     }
 
-    // 2. 차지 이펙트 (기를 모을 때 몸 주변에 먹물 파동 일렁임)
+    // 기 모으기 먹 파동 이펙트
     if (this.isCharging) {
-      const chargeRatio = this.chargeTimer / 1.0;
+      const isFull = this.chargeTimer >= 0.85;
       ctx.save();
-      ctx.strokeStyle = chargeRatio >= 1.0 ? "#8a2420" : "rgba(35, 30, 24, 0.7)";
-      ctx.lineWidth = chargeRatio >= 1.0 ? 4 : 2;
+      ctx.strokeStyle = isFull ? "#8a2420" : "rgba(35, 30, 24, 0.7)";
+      ctx.lineWidth = isFull ? 4 : 2;
       ctx.beginPath();
       const r = 35 + Math.sin(this.breathe * 6) * 6;
       ctx.arc(this.x + this.hitW / 2, this.y + this.hitH / 2, r, 0, Math.PI * 2);
@@ -333,7 +364,6 @@ export class Player {
       ctx.restore();
     }
 
-    // 3. 본체 트랜스폼 및 피격 무적 점멸
     ctx.translate(this.x + this.hitW / 2, this.y + this.hitH);
     if (this.facing < 0) ctx.scale(-1, 1);
     ctx.rotate(this.tilt);
@@ -350,7 +380,6 @@ export class Player {
       this.drawSuibokuShape(ctx, this.swordAngle, breatheOff);
     }
 
-    // 4. 패링 성공 낙관
     if (this.parryFlashText > 0) {
       ctx.fillStyle = "#8a2420";
       ctx.font = "bold 28px 'Noto Serif KR', serif";
@@ -360,7 +389,7 @@ export class Player {
     ctx.restore();
   }
 
-  // 원화 1:1 수묵 필치 절차적 렌더러[cite: 8]
+  // [원화 image_9fa209.png 1:1 수묵 필치 절차적 렌더러][cite: 8]
   drawSuibokuShape(ctx, swordAngle, breatheOff) {
     ctx.save();
 
@@ -370,7 +399,7 @@ export class Player {
     ctx.ellipse(0, -3, 50, 11, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 파검(破劍) 대도[cite: 8]
+    // 파검(破劍) 대도 & 비백(飛白) 여백[cite: 8]
     ctx.save();
     ctx.translate(10, -50 + breatheOff);
     ctx.rotate(swordAngle);
@@ -387,7 +416,6 @@ export class Player {
     ctx.fillStyle = "#1b1713";
     ctx.fillRect(-12, 2, 95, 6);
 
-    // 원화 특유의 비백(飛白) 타원 여백[cite: 8]
     ctx.fillStyle = "#f7f4eb";
     ctx.beginPath();
     ctx.ellipse(55, 4, 10, 5, 0.2, 0, Math.PI * 2);
