@@ -35,7 +35,7 @@ export const GameState = {
 
   tutorialStep: 0,
 
-  // 록맨식 투사체 (검기 / 적 탄환)
+  // 록맨식 투사체 (검기 파동 / 적 탄환)
   projectiles: [],
 
   addCombo() {
