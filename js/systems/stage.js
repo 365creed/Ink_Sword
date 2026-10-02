@@ -20,7 +20,6 @@ export class StageSystem {
     GameState.mode = 'STAGE_INTRO';
     this.introTimer = 2.5;
 
-    // 현재 스테이지 발판 목록 주입
     const stData = GameState.getCurrentStageData();
     this.platforms = stData.platforms || [];
 
@@ -37,7 +36,6 @@ export class StageSystem {
     this.engine.player.vx = 0;
     this.engine.player.vy = 0;
 
-    // 1구역 탐색로 적
     this.engine.enemies.push(new Enemy(this.engine.ctx, 750, 528, 'grunt'));
     this.engine.enemies.push(new Enemy(this.engine.ctx, 1100, 528, 'grunt'));
   }
@@ -56,7 +54,7 @@ export class StageSystem {
 
     const px = this.engine.player.x;
 
-    // 2구역: 묵계 결계 봉쇄 (X = 1450)
+    // 2구역: 결계 봉쇄전 (X = 1450)
     if (px >= 1350 && !this.barrier1Cleared) {
       GameState.activeBarrierX = 1450;
       GameState.minBarrierX = 900;
@@ -82,7 +80,7 @@ export class StageSystem {
       GameState.ink = Math.min(GameState.maxInk, GameState.ink + 35 * dt);
     }
 
-    // 4구역: 록맨식 보스 룸 아레나 (X = 2750)
+    // 4구역: 최종 결전 (X = 2750)
     if (px >= 2750 && !this.bossSpawned) {
       this.bossSpawned = true;
       GameState.activeBarrierX = 3700;
