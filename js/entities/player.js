@@ -1,303 +1,461 @@
-// js/entities/player.js
-class Player {
-  constructor(x, y) {
+import { GameState } from '../core/state.js';
+
+export class Player {
+  constructor(ctx, x, y, sound) {
+    this.ctx = ctx;
+    this.sound = sound;
     this.x = x;
     this.y = y;
+
+    this.hitW = 56;
+    this.hitH = 98;
+    this.renderW = 142;
+    this.renderH = 116;
+
     this.vx = 0;
     this.vy = 0;
-    this.width = 40;
-    this.height = 54;
-    this.facing = 1; // 1: 우측, -1: 좌측
+    this.facing = 1;
+    this.isGrounded = false;
 
-    // 스테이터스
-    this.hp = 100;
-    this.maxHp = 100;
-    this.ink = 100;
-    this.maxInk = 100;
-
-    // 물리 상태
-    this.onGround = false;
+    // 록맨식 차지(기 모으기) & 대시 물리
+    this.chargeTimer = 0;
+    this.isCharging = false;
     this.isDashing = false;
     this.dashTimer = 0;
-    this.dashCooldown = 0;
-    this.isDashJumping = false;
-    this.dashJumpVx = 0;
 
-    // 공격 & 급강하
-    this.isAttacking = false;
-    this.attackTimer = 0;
-    this.attackType = 'normal'; // 'normal', 'heavy', 'plunge'
-    this.isPlunging = false;
-
-    // 패링
-    this.isParrying = false;
-    this.parryTimer = 0;
-    this.parryWindow = 0.22; // 0.22초 정밀 판정
-
-    // 무적 및 피격
+    // 2.5D 모션 및 외형
+    this.scaleX = 1.0;
+    this.scaleY = 1.0;
+    this.tilt = 0;
+    this.breathe = 0;
+    this.swordAngle = 0.55;
+    this.parryFlashText = 0;
     this.invincibleTimer = 0;
-    this.combo = 0;
-    this.comboTimer = 0;
 
-    this.attackBox = null;
+    this.state = 'idle'; // idle, run, jump, attack, heavy, dash, parry, hurt
+    this.stateTimer = 0;
+    this.dashGhosts = [];
+
+    this.img = new Image();
+    this.imgLoaded = false;
+    this.img.onload = () => { this.imgLoaded = true; };
+    this.img.src = 'assets/images/player.png';
   }
 
-  jump() {
-    if (this.onGround) {
-      this.vy = -560;
-      this.onGround = false;
+  // 1. 기본 참격 (지상 3연타 및 공중 회전베기)
+  attack(brush, ink, enemies, boss) {
+    if (this.isDashing || this.state === 'parry') return;
+    this.state = 'attack';
+    this.stateTimer = 0.22;
+    this.sound.playSlash();
 
-      // 대시 중 점프 시: 대시 점프 발동 (관성 보존)
-      if (this.isDashing) {
-        this.isDashJumping = true;
-        this.dashJumpVx = this.facing * 460;
-        SoundManager.play('dash_jump');
-        EffectManager.addInkSplash(this.x, this.y + 20, 15);
-      } else {
-        this.isDashJumping = false;
-        SoundManager.play('jump');
-      }
-    }
+    this.tilt = this.facing * 0.22;
+    this.swordAngle = -0.85;
+    this.scaleX = 1.25;
+    this.scaleY = 0.85;
+
+    const atkX = this.x + (this.facing > 0 ? this.hitW + 40 : -40);
+    const atkY = this.y + this.hitH / 2;
+    brush.addSlash(atkX, atkY, this.facing, 'normal');
+    this.checkHit(atkX, atkY, 105, 28, ink, enemies, boss, false);
   }
 
-  startDash() {
-    if (this.dashCooldown <= 0 && this.ink >= 15) {
-      this.isDashing = true;
-      this.dashTimer = 0.24;
-      this.dashCooldown = 0.55;
-      this.invincibleTimer = 0.24;
-      this.ink = Math.max(0, this.ink - 15);
-      this.vx = this.facing * 440;
-      SoundManager.play('dash');
-      EffectManager.addDashGhost(this.x, this.y, this.facing);
-    }
+  // 2. 록맨 차지샷: 묵빛 검기 파동 발사 (K 키)
+  startCharge() {
+    this.isCharging = true;
   }
 
-  startParry() {
-    if (!this.isParrying && this.onGround) {
-      this.isParrying = true;
-      this.parryTimer = this.parryWindow;
-      SoundManager.play('parry_ready');
-    }
-  }
+  releaseCharge(brush, ink, enemies, boss) {
+    if (!this.isCharging) return;
+    const charged = this.chargeTimer >= 1.0; // 1초 이상 모으면 풀차지
+    this.isCharging = false;
+    this.chargeTimer = 0;
 
-  // 공격 핸들러 (입력 상태 inputState: { down: boolean })
-  triggerAttack(isHeavy = false, inputState = {}) {
-    if (this.isAttacking || this.isPlunging) return;
+    if (charged) {
+      if (!GameState.useInk(20)) return;
+      this.sound.playHeavySlash();
+      this.tilt = this.facing * 0.3;
+      this.swordAngle = -1.2;
 
-    // 공중에서 아래 방향키(S/↓) + 공격 => 급강하 하향 베기
-    if (!this.onGround && inputState.down) {
-      this.isPlunging = true;
-      this.attackType = 'plunge';
-      this.vy = 760;
-      this.vx = this.facing * 120;
-      SoundManager.play('plunge_dive');
-      return;
-    }
-
-    // 지상 공격
-    if (this.onGround) {
-      if (isHeavy) {
-        if (this.ink >= 25) {
-          this.ink -= 25;
-          this.isAttacking = true;
-          this.attackType = 'heavy';
-          this.attackTimer = 0.38;
-          SoundManager.play('heavy_slash');
-        }
-      } else {
-        this.isAttacking = true;
-        this.attackType = 'normal';
-        this.attackTimer = 0.22;
-        SoundManager.play('normal_slash');
-      }
-    }
-  }
-
-  update(dt, inputState) {
-    // 쿨다운 업데이트
-    if (this.dashCooldown > 0) this.dashCooldown -= dt;
-    if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
-    
-    // 콤보 타이머 (2.2초간 미공격 시 리셋)
-    if (this.comboTimer > 0) {
-      this.comboTimer -= dt;
-      if (this.comboTimer <= 0) this.combo = 0;
-    }
-
-    // 먹 자연 회복
-    if (this.ink < this.maxInk) {
-      this.ink = Math.min(this.maxInk, this.ink + dt * 18);
-    }
-
-    // 패링 타이머
-    if (this.isParrying) {
-      this.parryTimer -= dt;
-      if (this.parryTimer <= 0) this.isParrying = false;
-    }
-
-    // 지상 대시 감속
-    if (this.isDashing) {
-      this.dashTimer -= dt;
-      if (this.dashTimer <= 0) this.isDashing = false;
-    }
-
-    // 대시 점프 관성 보존
-    if (!this.onGround && this.isDashJumping) {
-      this.vx = this.dashJumpVx;
-    } else if (!this.isDashing) {
-      // 일반 좌우 걷기
-      if (inputState.left) {
-        this.vx = -210;
-        this.facing = -1;
-      } else if (inputState.right) {
-        this.vx = 210;
-        this.facing = 1;
-      } else {
-        this.vx *= 0.8;
-      }
-    }
-
-    // 중력 적용
-    this.vy += 1400 * dt;
-    if (this.vy > 900) this.vy = 900;
-
-    // 위치 갱신
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
-
-    // 지면 충돌 판정 (바닥 Y = 380 기준)
-    const groundY = 380 - this.height;
-    if (this.y >= groundY) {
-      this.y = groundY;
-      this.vy = 0;
-      this.onGround = true;
-      this.isDashJumping = false;
-
-      // 급강하 착지 시 먹물 충격파 발생
-      if (this.isPlunging) {
-        this.isPlunging = false;
-        SoundManager.play('ground_slam');
-        EffectManager.addGroundShockwave(this.x, this.y + this.height);
-        this.triggerPlungeLandingHit();
-      }
-    }
-
-    // 공격 타이머 및 히트박스 계산
-    this.updateHitboxes(dt);
-  }
-
-  updateHitboxes(dt) {
-    if (this.isPlunging) {
-      // 급강하 중 히트박스: 캐릭터 발밑 전체
-      this.attackBox = {
-        x: this.x - 20,
-        y: this.y + 10,
-        width: 60,
-        height: 60,
-        damage: 40,
-        type: 'plunge'
-      };
-      return;
-    }
-
-    if (this.isAttacking) {
-      this.attackTimer -= dt;
-      const reach = this.attackType === 'heavy' ? 75 : 55;
-      const hX = this.facing === 1 ? this.x + 20 : this.x - reach + 10;
-      this.attackBox = {
-        x: hX,
-        y: this.y + 8,
-        width: reach,
-        height: 40,
-        damage: this.attackType === 'heavy' ? 45 : 22,
-        type: this.attackType
-      };
-
-      if (this.attackTimer <= 0) {
-        this.isAttacking = false;
-        this.attackBox = null;
-      }
+      // 록맨식 거대 검기 투사체 생성
+      GameState.projectiles.push({
+        x: this.x + (this.facing > 0 ? this.hitW + 20 : -30),
+        y: this.y + 35,
+        vx: this.facing * 850,
+        dmg: 65,
+        r: 32,
+        isPlayer: true,
+        life: 2.0
+      });
+      brush.addSlash(this.x + this.facing * 50, this.y + 40, this.facing, 'heavy');
     } else {
-      this.attackBox = null;
+      // 일반 강공격
+      if (!GameState.useInk(10)) return;
+      this.sound.playSlash();
+      GameState.projectiles.push({
+        x: this.x + (this.facing > 0 ? this.hitW + 15 : -25),
+        y: this.y + 40,
+        vx: this.facing * 650,
+        dmg: 35,
+        r: 18,
+        isPlayer: true,
+        life: 1.5
+      });
     }
   }
 
-  triggerPlungeLandingHit() {
-    this.attackBox = {
-      x: this.x - 80,
-      y: this.y + 10,
-      width: 160,
-      height: 45,
-      damage: 50,
-      type: 'plunge_shockwave'
-    };
-    setTimeout(() => {
-      if (this.attackBox && this.attackBox.type === 'plunge_shockwave') {
-        this.attackBox = null;
-      }
-    }, 120);
+  // 3. 록맨식 지상 슬라이딩 / 공중 에어 대시 (Shift / L)
+  dash() {
+    if (this.isDashing) return;
+    if (!GameState.useInk(15)) return;
+    this.isDashing = true;
+    this.dashTimer = 0.28;
+    this.sound.playDash();
+    this.vx = this.facing * 920;
+
+    this.scaleX = 1.45;
+    this.scaleY = 0.65;
+    this.swordAngle = 0.8;
+    this.dashGhosts.push({ x: this.x, y: this.y, facing: this.facing, alpha: 0.85 });
   }
 
-  takeDamage(amount, fromX) {
-    if (this.invincibleTimer > 0) return false;
+  parry() {
+    if (this.isDashing || this.state === 'parry') return;
+    this.state = 'parry';
+    this.stateTimer = 0.25;
+    this.swordAngle = -1.57; // 대도를 수직으로 꼿꼿이 세움
+    this.scaleX = 0.85;
+    this.scaleY = 1.22;
+  }
 
-    // 패링 성공 판정
-    if (this.isParrying) {
-      SoundManager.play('parry_success');
-      EffectManager.addCalligraphyText(this.x, this.y - 30, '返');
-      EffectManager.addSpark(this.x, this.y);
-      this.ink = Math.min(this.maxInk, this.ink + 40);
-      this.combo++;
-      this.comboTimer = 2.5;
-      this.invincibleTimer = 0.35;
+  takeDamage(amount, ink, engine) {
+    if (this.isDashing) return 'dodged';
+    if (this.invincibleTimer > 0) return 'invulnerable';
+
+    if (this.state === 'parry') {
+      GameState.parries++;
+      GameState.addInk(35);
+      GameState.addCombo();
+      this.sound.playParry();
+      engine.triggerHitStop(0.14);
+      engine.triggerShake(12, 0.22);
+      engine.triggerWhiteFlash(0.08);
+      ink.parryBurst(this.x + this.hitW / 2, this.y + 45);
+      this.state = 'idle';
+      this.parryFlashText = 0.35;
       return 'parried';
     }
 
-    // 일반 피격
-    this.hp = Math.max(0, this.hp - amount);
-    this.invincibleTimer = 0.8;
-    this.vx = (this.x < fromX ? -1 : 1) * 220;
-    SoundManager.play('hurt');
-    EffectManager.addInkSplash(this.x, this.y, 25);
+    GameState.hp -= amount;
+    GameState.hitsTaken++;
+    GameState.resetCombo();
+    this.sound.playInkDrop();
+    engine.triggerHitStop(0.06);
+    engine.triggerShake(8, 0.18);
+    ink.splash(this.x + this.hitW / 2, this.y + 45, 15, "rgba(130, 24, 20, ");
+    this.state = 'hurt';
+    this.stateTimer = 0.22;
+    this.invincibleTimer = 0.6; // 0.6초 피격 무적
+    this.tilt = -this.facing * 0.25;
+
+    if (GameState.hp <= 0) {
+      GameState.hp = 0;
+      GameState.mode = 'GAME_OVER';
+    }
     return 'hit';
   }
 
-  render(ctx) {
+  checkHit(atkX, atkY, range, damage, ink, enemies, boss, isHeavy) {
+    let hitCount = 0;
+    enemies.forEach((e) => {
+      if (!e.isDead && Math.hypot(e.x + e.w / 2 - atkX, e.y + e.h / 2 - atkY) < range) {
+        e.takeDamage(damage, ink);
+        GameState.addInk(isHeavy ? 15 : 8);
+        GameState.addCombo();
+        hitCount++;
+      }
+    });
+
+    if (boss && !boss.isDead && Math.hypot(boss.x + boss.w / 2 - atkX, boss.y + boss.h / 2 - atkY) < range + 40) {
+      boss.takeDamage(damage, ink);
+      GameState.addInk(16);
+      GameState.addCombo();
+      hitCount++;
+    }
+
+    if (hitCount > 0) this.sound.playInkDrop();
+  }
+
+  // 록맨식 가변 점프 (키를 짧게 누르면 낮게, 길게 누르면 높게)
+  jump() {
+    if (this.isGrounded) {
+      this.vy = -620;
+      this.isGrounded = false;
+      this.scaleX = 0.8;
+      this.scaleY = 1.25;
+    }
+  }
+
+  cutJump() {
+    if (this.vy < -200) {
+      this.vy = -200; // 키를 떼면 상승 감속
+    }
+  }
+
+  update(dt, input, platforms = []) {
+    this.breathe += dt * 2.5;
+    if (this.parryFlashText > 0) this.parryFlashText -= dt;
+    if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
+
+    // 기 모으기 타이머
+    if (this.isCharging) {
+      this.chargeTimer = Math.min(1.5, this.chargeTimer + dt);
+    }
+
+    // 대시 타이머
+    if (this.isDashing) {
+      this.dashTimer -= dt;
+      if (this.dashTimer <= 0) {
+        this.isDashing = false;
+      }
+    }
+
+    // 잔상 감쇠
+    for (let i = this.dashGhosts.length - 1; i >= 0; i--) {
+      this.dashGhosts[i].alpha -= dt * 3.5;
+      if (this.dashGhosts[i].alpha <= 0) this.dashGhosts.splice(i, 1);
+    }
+
+    if (this.stateTimer > 0) {
+      this.stateTimer -= dt;
+      if (this.stateTimer <= 0 && this.state !== 'idle') {
+        this.state = 'idle';
+        this.swordAngle = 0.55;
+      }
+    }
+
+    // 좌우 이동 (록맨식 즉각적인 반응성)
+    if (!this.isDashing) {
+      if (input.left) {
+        this.vx = -340;
+        this.facing = -1;
+        this.tilt = -0.08;
+      } else if (input.right) {
+        this.vx = 340;
+        this.facing = 1;
+        this.tilt = 0.08;
+      } else {
+        this.vx = 0;
+        this.tilt *= 0.8;
+      }
+    }
+
+    // 중력 및 이동
+    this.vy += 1400 * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+
+    // --- [핵심] 록맨식 플랫폼(발판) 충돌 판정 (상단 착지) ---
+    this.isGrounded = false;
+
+    // 1. 공중 발판들 검사
+    for (const plat of platforms) {
+      const prevY = this.y - this.vy * dt;
+      // 발판 위에서 아래로 떨어질 때만 착지
+      if (
+        this.x + this.hitW > plat.x &&
+        this.x < plat.x + plat.w &&
+        prevY + this.hitH <= plat.y + 12 &&
+        this.y + this.hitH >= plat.y
+      ) {
+        this.y = plat.y - this.hitH;
+        this.vy = 0;
+        this.isGrounded = true;
+        break;
+      }
+    }
+
+    // 2. 최하단 바닥선 (Y = 620)
+    if (!this.isGrounded && this.y + this.hitH >= 620) {
+      this.y = 620 - this.hitH;
+      this.vy = 0;
+      this.isGrounded = true;
+    }
+
+    // 점프/낙하 시 스케일 탄성
+    if (!this.isGrounded) {
+      if (this.vy < 0) {
+        this.scaleX = 0.88;
+        this.scaleY = 1.18;
+      } else {
+        this.scaleX = 1.05;
+        this.scaleY = 0.95;
+      }
+    }
+
+    this.scaleX += (1.0 - this.scaleX) * 0.15;
+    this.scaleY += (1.0 - this.scaleY) * 0.15;
+
+    // 결계 벽 및 월드 경계 제한
+    let minX = Math.max(30, GameState.cameraX);
+    if (GameState.minBarrierX !== null) minX = Math.max(minX, GameState.minBarrierX + 20);
+
+    let maxX = GameState.worldWidth - this.hitW - 30;
+    if (GameState.activeBarrierX !== null) maxX = Math.min(maxX, GameState.activeBarrierX - this.hitW - 10);
+
+    this.x = Math.max(minX, Math.min(maxX, this.x));
+  }
+
+  render() {
+    const ctx = this.ctx;
     ctx.save();
 
-    // 무적 점멸
-    if (this.invincibleTimer > 0 && Math.floor(Date.now() / 60) % 2 === 0) {
-      ctx.globalAlpha = 0.45;
+    // 1. 록맨식 대시 갈필 잔상
+    for (const g of this.dashGhosts) {
+      ctx.save();
+      ctx.translate(g.x + this.hitW / 2, g.y + this.hitH);
+      if (g.facing < 0) ctx.scale(-1, 1);
+      ctx.fillStyle = `rgba(35, 30, 24, ${g.alpha * 0.4})`;
+      this.drawSuibokuShape(ctx, 0.55, 0);
+      ctx.restore();
     }
 
-    // 대시 점프 및 급강하 잔상 궤적
-    if (this.isDashJumping || this.isPlunging) {
-      ctx.fillStyle = 'rgba(20, 20, 20, 0.25)';
-      ctx.fillRect(this.x - (this.vx * 0.04), this.y, this.width, this.height);
-    }
-
-    // 본체 (수묵 검객 실루엣)
-    ctx.fillStyle = '#141416';
-    ctx.fillRect(this.x, this.y, this.width, this.height);
-
-    // 갓/머리 묘사
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(this.x - 4, this.y - 6, this.width + 8, 8);
-
-    // 붉은 띠 포인트
-    ctx.fillStyle = '#8b1e1e';
-    ctx.fillRect(this.facing === 1 ? this.x + 22 : this.x + 8, this.y + 12, 10, 4);
-
-    // 급강하 중 수직 검기 렌더링
-    if (this.isPlunging) {
-      ctx.strokeStyle = '#111';
-      ctx.lineWidth = 4;
+    // 2. 차지 이펙트 (기를 모을 때 몸 주변에 먹물 파동 일렁임)
+    if (this.isCharging) {
+      const chargeRatio = this.chargeTimer / 1.0;
+      ctx.save();
+      ctx.strokeStyle = chargeRatio >= 1.0 ? "#8a2420" : "rgba(35, 30, 24, 0.7)";
+      ctx.lineWidth = chargeRatio >= 1.0 ? 4 : 2;
       ctx.beginPath();
-      ctx.moveTo(this.x + this.width / 2, this.y + this.height);
-      ctx.lineTo(this.x + this.width / 2, this.y + this.height + 25);
+      const r = 35 + Math.sin(this.breathe * 6) * 6;
+      ctx.arc(this.x + this.hitW / 2, this.y + this.hitH / 2, r, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
     }
+
+    // 3. 본체 트랜스폼 및 피격 무적 점멸
+    ctx.translate(this.x + this.hitW / 2, this.y + this.hitH);
+    if (this.facing < 0) ctx.scale(-1, 1);
+    ctx.rotate(this.tilt);
+    ctx.scale(this.scaleX, this.scaleY);
+
+    if (this.invincibleTimer > 0 && Math.floor(this.invincibleTimer * 20) % 2 === 0) {
+      ctx.globalAlpha = 0.35;
+    }
+
+    if (this.imgLoaded) {
+      ctx.drawImage(this.img, -this.renderW / 2, -this.renderH + 10, this.renderW, this.renderH);
+    } else {
+      const breatheOff = Math.sin(this.breathe) * 2;
+      this.drawSuibokuShape(ctx, this.swordAngle, breatheOff);
+    }
+
+    // 4. 패링 성공 낙관
+    if (this.parryFlashText > 0) {
+      ctx.fillStyle = "#8a2420";
+      ctx.font = "bold 28px 'Noto Serif KR', serif";
+      ctx.fillText("返", 0, -this.hitH - 25);
+    }
+
+    ctx.restore();
+  }
+
+  // 원화 1:1 수묵 필치 절차적 렌더러[cite: 8]
+  drawSuibokuShape(ctx, swordAngle, breatheOff) {
+    ctx.save();
+
+    // 발밑 갈필 먹그림자[cite: 8]
+    ctx.fillStyle = "rgba(45, 38, 30, 0.45)";
+    ctx.beginPath();
+    ctx.ellipse(0, -3, 50, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 파검(破劍) 대도[cite: 8]
+    ctx.save();
+    ctx.translate(10, -50 + breatheOff);
+    ctx.rotate(swordAngle);
+
+    ctx.fillStyle = "#332c24";
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(85, -8);
+    ctx.lineTo(100, 12);
+    ctx.lineTo(-5, 18);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#1b1713";
+    ctx.fillRect(-12, 2, 95, 6);
+
+    // 원화 특유의 비백(飛白) 타원 여백[cite: 8]
+    ctx.fillStyle = "#f7f4eb";
+    ctx.beginPath();
+    ctx.ellipse(55, 4, 10, 5, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#15120f";
+    ctx.fillRect(-28, -2, 20, 7);
+    ctx.restore();
+
+    // 3층 농담 도포[cite: 8]
+    ctx.fillStyle = "#6d6252"; // 담묵[cite: 8]
+    ctx.beginPath();
+    ctx.moveTo(-35, -15);
+    ctx.lineTo(-20, -75 + breatheOff);
+    ctx.lineTo(25, -75 + breatheOff);
+    ctx.lineTo(40, -15);
+    ctx.lineTo(20, -2);
+    ctx.lineTo(-20, -2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#3a3329"; // 중묵[cite: 8]
+    ctx.beginPath();
+    ctx.moveTo(-28, -20);
+    ctx.lineTo(-14, -68 + breatheOff);
+    ctx.lineTo(18, -68 + breatheOff);
+    ctx.lineTo(28, -20);
+    ctx.lineTo(8, -4);
+    ctx.lineTo(-16, -4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#1c1813"; // 농묵[cite: 8]
+    ctx.fillRect(-15, -45 + breatheOff, 28, 25);
+
+    // 3단 계단형 갈모(삿갓)[cite: 8]
+    ctx.translate(0, -76 + breatheOff);
+    ctx.fillStyle = "#181410";
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 42, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#463d31";
+    ctx.beginPath();
+    ctx.moveTo(-46, 2);
+    ctx.lineTo(46, 2);
+    ctx.lineTo(32, -10);
+    ctx.lineTo(-32, -10);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#736756";
+    ctx.beginPath();
+    ctx.moveTo(-30, -9);
+    ctx.lineTo(30, -9);
+    ctx.lineTo(18, -22);
+    ctx.lineTo(-18, -22);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#1c1813";
+    ctx.beginPath();
+    ctx.moveTo(-16, -21);
+    ctx.lineTo(16, -21);
+    ctx.lineTo(6, -30);
+    ctx.lineTo(-6, -30);
+    ctx.closePath();
+    ctx.fill();
 
     ctx.restore();
   }
