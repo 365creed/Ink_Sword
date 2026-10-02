@@ -115,3 +115,5 @@ export class SoundEngine {
     osc.stop(this.ctx.currentTime + 0.17);
   }
 }
+
+export default SoundEngine;
