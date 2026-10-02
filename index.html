@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>묵검 (墨劍) - 수묵 플랫포머</title>
+  <title>묵검 (墨劍)</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <meta name="mobile-web-app-capable" content="yes">
@@ -14,12 +14,12 @@
     <div class="top-nav">
       <button id="pause-btn" class="ink-btn">❚❚ 일시정지 (P)</button>
       <button id="help-btn" class="ink-btn">? 조작법 (H)</button>
+      <button id="clear-cache-btn" class="ink-btn" style="color: #8a2420;">⚡ 캐시비우기 (C)</button>
       <button id="fullscreen-btn" class="ink-btn">⛶ 전체화면 (F)</button>
     </div>
 
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
 
-    <!-- 록맨 스타일 모바일 수묵 패드 -->
     <div class="mobile-controls">
       <div class="touch-group">
         <button id="m-left" class="stamp-btn sub">◀</button>
@@ -36,24 +36,53 @@
     </div>
   </div>
 
-  <script type="module" src="main.js"></script>
-
+  <!-- [자가 진단 스크립트: 흰 화면 버그 원천 차단] -->
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        try {
-          const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-          reg.update();
-          let refreshing = false;
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
-              refreshing = true;
-              window.location.reload();
-            }
-          });
-        } catch (err) {}
+    // 1. file:/// 로컬 실행 감지 경고
+    if (window.location.protocol === 'file:') {
+      window.addEventListener('load', () => {
+        const cvs = document.getElementById('gameCanvas');
+        if (cvs) {
+          const ctx = cvs.getContext('2d');
+          ctx.fillStyle = "#2c2620";
+          ctx.fillRect(0, 0, cvs.width, cvs.height);
+          ctx.fillStyle = "#ff6b6b";
+          ctx.font = "bold 26px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("경고: file:/// 로컬 파일로 직접 실행할 수 없습니다!", 640, 320);
+          ctx.fillStyle = "#f7f4eb";
+          ctx.font = "18px sans-serif";
+          ctx.fillText("브라우저 보안(CORS)으로 모듈이 차단되었습니다. VS Code의 'Live Server'로 실행하세요.", 640, 370);
+        }
+      });
+    }
+
+    // 2. 화면 직접 에러 출력기 (스크립트 오류 시 흰 화면 대신 에러 로그 출력)
+    window.addEventListener('error', (e) => {
+      const cvs = document.getElementById('gameCanvas');
+      if (cvs) {
+        const ctx = cvs.getContext('2d');
+        ctx.fillStyle = "rgba(40, 10, 10, 0.95)";
+        ctx.fillRect(40, 40, cvs.width - 80, cvs.height - 80);
+        ctx.fillStyle = "#ff8888";
+        ctx.font = "bold 22px monospace";
+        ctx.textAlign = "left";
+        ctx.fillText("자바스크립트 실행 오류 감지:", 70, 90);
+        ctx.font = "16px monospace";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(e.message || "Unknown Script Error", 70, 130);
+        ctx.fillText(`파일: ${e.filename || 'module'} (${e.lineno}:${e.colno})`, 70, 170);
+      }
+    });
+
+    // 3. 서비스 워커 안전 등록
+    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
       });
     }
   </script>
+
+  <script type="module" src="main.js"></script>
 </body>
 </html>
