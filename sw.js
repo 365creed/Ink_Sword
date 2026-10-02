@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ink-sword-cache-v12';
+const CACHE_NAME = 'ink-sword-cache-v14-fix';
 const ASSETS = [
   './index.html',
   './style.css',
@@ -47,7 +47,6 @@ self.addEventListener('fetch', (e) => {
       .catch(() => {
         return caches.match(e.request).then((cached) => {
           if (cached) return cached;
-          // 오직 페이지 이동(HTML 네비게이션)일 때만 index.html 반환 (JS 파일 문법 에러 원천 차단)
           if (e.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
