@@ -6,27 +6,26 @@
   <title>묵검(墨劍) : 화폭의 망자</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#141413">
-  <!-- 동양풍 명조/서예 웹폰트 (오프라인 시 시스템 명조체로 자동 폴백) -->
-  <link href="https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&family=Noto+Serif+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>墨</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=East Sea+Dokdo&family=Noto+Serif+KR:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="game-wrapper">
-    <!-- 메인 게임 렌더링 캔버스 -->
     <canvas id="game-canvas" width="1280" height="720"></canvas>
-
-    <!-- 한지 질감 및 먹물 비네팅 오버레이 -->
     <div id="hanji-overlay"></div>
     <div id="vignette-overlay"></div>
 
     <!-- 인게임 전투 HUD -->
     <div id="hud" class="hidden">
       <div class="hud-top">
-        <!-- 플레이어 상태 (체력, 혈묵, 덧칠 횟수, 장착 명묵) -->
         <div class="status-box">
           <div class="Seal-badge" id="hud-ink-badge" title="현재 장착된 명묵">墨</div>
           <div class="bars-wrap">
-            <div class="bar-label">기력(氣力) <span id="hp-text">100/100</span></div>
+            <div class="bar-label">
+              <span>기력(氣力) <strong id="hp-text">100/100</strong></span>
+              <span class="lives-wrap">심지(목숨): <strong id="lives-display" class="lives-dots">● ● ●</strong></span>
+            </div>
             <div class="bar-container hp-bar-bg">
               <div id="hp-bar" class="bar-fill"></div>
             </div>
@@ -35,30 +34,27 @@
               <div id="karma-bar" class="bar-fill"></div>
             </div>
             <div class="sub-stats">
-              <span>덧칠(부활)의 업: <strong id="death-count">0</strong>회</span>
+              <span>누적 덧칠(업보): <strong id="death-count">0</strong>회</span>
               <span>사슬 쿨타임: <strong id="chain-status">준비됨</strong></span>
             </div>
           </div>
         </div>
 
-        <!-- 현재 화폭의 금기 (수묵화 세계 규칙 표시창) -->
         <div class="rule-box">
           <div class="rule-header">【 화주(畫主)의 계율 】</div>
           <div id="active-rule-title" class="rule-title">여백의 금기</div>
-          <div id="active-rule-desc" class="rule-desc">먹물이 닿지 않은 백지(공중)에 3초 이상 머물면 존재가 지워진다.</div>
+          <div id="active-rule-desc" class="rule-desc">먹물이 닿지 않은 백지(공중)에 오래 머물면 존재가 지워진다.</div>
           <div id="rule-penalty-gauge" class="rule-gauge-bg">
             <div id="rule-penalty-fill" class="rule-gauge-fill"></div>
           </div>
         </div>
 
-        <!-- 우측 퀵 메뉴 -->
         <div class="hud-menu-btns">
           <button id="btn-open-equip" class="ink-btn-small">장구(낙관/먹)</button>
           <button id="btn-pause" class="ink-btn-small">화폭 접기(일시정지)</button>
         </div>
       </div>
 
-      <!-- 보스 체력바 (보스전 돌입 시 활성화) -->
       <div id="boss-hud" class="hidden">
         <div id="boss-name" class="boss-title">사군자 : 매화검귀(梅花劍鬼)</div>
         <div class="boss-bar-bg">
@@ -66,7 +62,6 @@
         </div>
       </div>
 
-      <!-- 스토리 대화창 및 회상 나레이션 (전우치/산나비 스타일) -->
       <div id="story-box" class="hidden">
         <div id="speaker-seal" class="speaker-seal">화공</div>
         <div class="dialogue-content">
@@ -74,6 +69,29 @@
           <div id="dialogue-text" class="dialogue-text">이 화폭을 전부 갈기갈기 찢어발겨서라도... 내 아이를 데려오겠다.</div>
         </div>
         <div class="dialogue-next">클릭 또는 [Space]로 계속 ▶</div>
+      </div>
+    </div>
+
+    <!-- 사망(탈묵) 및 목숨 소진(게임오버) 안내 모달 -->
+    <div id="death-modal" class="modal-overlay hidden">
+      <div class="modal-scroll death-dialog">
+        <div class="death-seal-stamp" id="death-stamp">脫墨</div>
+        <h2 id="death-modal-title" class="death-title">【 탈묵(脫墨) — 육신의 먹물이 지워졌습니다 】</h2>
+        <p id="death-modal-desc" class="death-desc">
+          화폭의 충격으로 형체가 흩어졌습니다.<br>
+          남은 영혼의 심지를 태워 <strong>화폭의 출발선</strong>에서 다시 덧칠해 살아나시겠습니까?
+        </p>
+        <div class="death-lives-box">
+          남은 영혼의 심지(목숨): <span id="death-modal-lives" class="lives-dots">● ● ○</span>
+        </div>
+        <div class="death-Penalty-notice" id="death-penalty-notice">
+          ※ 덧칠하여 부활할 때마다 몸에 먹물 번짐(야차의 업보)이 누적됩니다.
+        </div>
+        <div class="death-action-btns">
+          <button id="btn-revive-checkpoint" class="ink-btn-large">심지를 태워 다시 그리기 (출발선에서 계속)</button>
+          <button id="btn-retry-stage" class="ink-btn-large hidden">화폭 처음부터 다시 펼치기 (스테이지 재도전)</button>
+          <button id="btn-death-to-title" class="ink-btn-small">붓을 내려놓고 표지(타이틀)로 돌아가기</button>
+        </div>
       </div>
     </div>
 
@@ -97,40 +115,30 @@
       </div>
     </div>
 
-    <!-- 자체 계정 & 세이브 슬롯 & 화첩 인장(백업 코드) 모달 -->
+    <!-- 자체 계정 & 세이브 슬롯 모달 -->
     <div id="account-modal" class="modal-overlay hidden">
       <div class="modal-scroll">
         <div class="modal-header">
           <h2>호패(계정) 및 화첩 기록 관리</h2>
           <button class="btn-close-modal" data-target="account-modal">✕</button>
         </div>
-
         <div class="modal-body">
-          <!-- 로그인 / 계정 생성 탭 -->
           <div class="auth-section">
             <h3>화공 호패 등록 / 접속 (오프라인 자체 계정)</h3>
-            <div class="auth-inputs">
-              <input type="text" id="auth-id" placeholder="호패 이름 (ID)" maxlength="16">
-              <input type="password" id="auth-pw" placeholder="암호 (PW)" maxlength="20">
-              <button id="btn-login" class="ink-btn-small">접속/생성</button>
-              <button id="btn-logout" class="ink-btn-small">하산(로그아웃)</button>
-            </div>
+            <form class="auth-inputs" onsubmit="return false;">
+              <input type="text" id="auth-id" placeholder="호패 이름 (ID)" maxlength="16" autocomplete="username">
+              <input type="password" id="auth-pw" placeholder="암호 (PW)" maxlength="20" autocomplete="current-password">
+              <button type="button" id="btn-login" class="ink-btn-small">접속/생성</button>
+              <button type="button" id="btn-logout" class="ink-btn-small">하산(로그아웃)</button>
+            </form>
             <p id="auth-msg" class="sys-msg">등록되지 않은 호패 입력 시 즉시 새 계정이 생성됩니다.</p>
           </div>
-
           <hr class="ink-divider">
-
-          <!-- 3개 세이브 슬롯 -->
           <div class="slots-section">
             <h3>기억의 두루마리 (세이브 슬롯)</h3>
-            <div id="save-slots-container" class="slots-grid">
-              <!-- JS에서 동적 생성 -->
-            </div>
+            <div id="save-slots-container" class="slots-grid"></div>
           </div>
-
           <hr class="ink-divider">
-
-          <!-- 화첩 인장 코드 (문자열 내보내기/불러오기) -->
           <div class="backup-section">
             <h3>화첩 인장 코드 (기기 간 세이브 이전)</h3>
             <p class="desc-small">서버 없이 다른 기기에서 이어하려면 아래 인장 코드를 복사해 다른 기기에 붙여넣으십시오.</p>
@@ -144,7 +152,7 @@
       </div>
     </div>
 
-    <!-- 장구(문방사우 명묵 & 낙관 장착) 및 기억 조각 모달 -->
+    <!-- 장구 모달 -->
     <div id="equip-modal" class="modal-overlay hidden">
       <div class="modal-scroll">
         <div class="modal-header">
@@ -170,7 +178,7 @@
       </div>
     </div>
 
-    <!-- 조작법 및 규칙 안내 모달 -->
+    <!-- 조작법 모달 -->
     <div id="controls-modal" class="modal-overlay hidden">
       <div class="modal-scroll">
         <div class="modal-header">
@@ -179,21 +187,20 @@
         </div>
         <div class="modal-body guide-text">
           <p><strong>[이동 및 도약]</strong> <kbd>A</kbd> <kbd>D</kbd> 또는 <kbd>←</kbd> <kbd>→</kbd> 이동 / <kbd>W</kbd>, <kbd>Space</kbd> 도약 및 벽 차기(Wall Jump)</p>
-          <p><strong>[묵영보(대시)]</strong> <kbd>Shift</kbd> 또는 <kbd>L</kbd> (지상 및 공중 고속 대시, 먹물 잔상 생성)</p>
-          <p><strong>[묵검술(베기)]</strong> <kbd>J</kbd> 또는 <kbd>좌클릭</kbd> (3단 연속 베기 / 길게 눌렀다 떼면 강력한 <strong>발도 차지 베기</strong>)</p>
-          <p><strong>[묵사슬(산나비 와이어)]</strong> <kbd>K</kbd> 또는 <kbd>우클릭</kbd> (마우스 커서 또는 전방 상단의 고리/적에게 묵사슬 투척 후 진자 반동 기동 및 적에게 고속 돌진)</p>
+          <p><strong>[묵영보(대시)]</strong> <kbd>Shift</kbd> 또는 <kbd>L</kbd> (지상 및 공중 고속 대시)</p>
+          <p><strong>[묵검술(베기)]</strong> <kbd>J</kbd> 또는 <kbd>좌클릭</kbd> (3단 연속 베기 / 길게 눌렀다 떼면 <strong>발도 차지 베기</strong>)</p>
+          <p><strong>[묵사슬(산나비 와이어)]</strong> <kbd>K</kbd> 또는 <kbd>우클릭</kbd> (고리 또는 적에게 사슬 투척 및 고속 기동)</p>
           <hr class="ink-divider">
-          <p><strong>[혈묵(血墨)과 덧칠(부활)의 법칙]</strong></p>
+          <p><strong>[영혼의 심지(목숨)와 덧칠 부활]</strong></p>
           <ul>
-            <li>화폭의 적과 기물을 파괴할수록 몸에 <strong>혈묵(업보)</strong>이 쌓입니다. 100%에 도달하면 공격력이 2배가 되나, 단 한 번의 피격으로 즉사(탈묵)합니다.</li>
-            <li>사망 시 보이지 않는 거대한 붓이 당신을 다시 덧칠하여 부활시킵니다. 단, <strong>덧칠 횟수가 누적될수록 주인공의 외형이 먹물로 일그러지며</strong> 결말에 영향을 미칩니다.</li>
+            <li>각 화폭마다 <strong>3개의 영혼 심지(목숨)</strong>가 주어집니다. 기력이 다하거나 낭떠러지로 추락하면 심지를 1개 소모하여 출발선에서 다시 그려질(부활) 수 있습니다.</li>
+            <li>심지 3개를 모두 잃으면 화폭에서 완전히 소멸(게임오버)하여 해당 스테이지를 처음부터 다시 시작해야 합니다.</li>
           </ul>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 메인 진입 스크립트 (ES6 Module) -->
   <script type="module" src="main.js"></script>
 </body>
 </html>
