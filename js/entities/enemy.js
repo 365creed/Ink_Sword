@@ -1,210 +1,182 @@
-import { GameState } from '../core/state.js';
+import { InkEffects } from '../effects/ink.js';
+import { SoundSystem } from '../core/sound.js';
+
+let enemyIdCounter = 1;
 
 export class Enemy {
-  constructor(ctx, x, y, type = 'grunt') {
-    this.ctx = ctx;
+  constructor(x, y, type = 'INK_GHOST') {
+    this.id = `enemy_${enemyIdCounter++}`;
     this.x = x;
     this.y = y;
-    this.type = type;
+    this.spawnX = x;
+    this.type = type; // 'INK_GHOST' | 'ARCHER' | 'WARDEN'
 
-    if (type === 'grunt') {
-      this.w = 54; this.h = 92; this.hp = 55; this.speed = 115; this.dmg = 12;
-    } else if (type === 'archer') {
-      this.w = 50; this.h = 86; this.hp = 38; this.speed = 85; this.dmg = 14;
-    } else {
-      this.w = 64; this.h = 78; this.hp = 35; this.speed = 240; this.dmg = 18;
-    }
+    this.width = type === 'WARDEN' ? 42 : 36;
+    this.height = type === 'WARDEN' ? 48 : 50;
+
+    this.maxHp = type === 'WARDEN' ? 95 : type === 'ARCHER' ? 55 : 70;
+    this.hp = this.maxHp;
+    this.isDead = false;
 
     this.vx = 0;
     this.vy = 0;
-    this.isGrounded = false;
-    this.isDead = false;
-    this.deathTimer = 0.35;
-    this.atkCooldown = Math.random() * 1.5 + 1.2;
-
-    this.phase = 'idle';
-    this.phaseTimer = 0;
+    this.facing = -1;
+    this.attackTimer = 1.5 + Math.random();
+    this.hitFlashTimer = 0;
+    this.animSeed = Math.random() * 10;
   }
 
-  takeDamage(amount, ink) {
-    this.hp -= amount;
-    if (this.hp <= 0 && !this.isDead) {
-      this.isDead = true;
-      ink.splash(this.x + this.w / 2, this.y + this.h / 2, 22);
-    }
-  }
+  update(dt, player, stage) {
+    if (this.isDead) return;
+    this.animSeed += dt * 5;
+    if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
 
-  update(dt, player, ink, engine, otherEnemies = [], platforms = []) {
-    if (this.isDead) {
-      this.deathTimer -= dt;
-      return;
-    }
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    this.facing = dx >= 0 ? 1 : -1;
 
-    // 적 간 겹침 방지 (Separation)
-    for (const other of otherEnemies) {
-      if (other !== this && !other.isDead) {
-        const dx = this.x - other.x;
-        if (Math.abs(dx) < 45) {
-          this.x += (45 - Math.abs(dx)) * 0.5 * (dx >= 0 ? 1 : -1) * dt * 6;
+    if (this.type === 'INK_GHOST') {
+      // 묵귀: 플레이어 감지 시 빠르게 접근하여 도약 할퀴기
+      if (dist < 420) {
+        this.vx += (this.facing * 210 - this.vx) * dt * 5;
+        if (dist < 54 && Math.abs(dy) < 48) {
+          player.takeDamage(14, this.facing);
+        }
+      } else {
+        // 순찰 이동
+        this.vx = Math.sin(this.animSeed * 0.4) * 90;
+      }
+      this.vy = Math.min(800, this.vy + 1200 * dt);
+    } else if (this.type === 'ARCHER') {
+      // 화폭 궁수: 거리를 유지하며 먹물 화살 조준 발사
+      this.vx *= 0.85;
+      this.vy = Math.min(800, this.vy + 1200 * dt);
+
+      if (dist < 560) {
+        this.attackTimer -= dt;
+        if (this.attackTimer <= 0) {
+          this.attackTimer = 2.1;
+          const angle = Math.atan2(dy - 10, dx);
+          stage.spawnProjectile({
+            x: this.x,
+            y: this.y - 8,
+            vx: Math.cos(angle) * 460,
+            vy: Math.sin(angle) * 460,
+            damage: 16,
+            color: '#141413',
+            fromEnemy: true
+          });
+          SoundSystem.playSlash(1);
         }
       }
-    }
-
-    const dist = Math.abs(this.x - player.x);
-    this.atkCooldown -= dt;
-
-    if (this.phaseTimer > 0) {
-      this.phaseTimer -= dt;
-      if (this.phaseTimer <= 0) {
-        if (this.phase === 'windup') {
-          this.phase = 'tell';
-          this.phaseTimer = 0.12;
-        } else if (this.phase === 'tell') {
-          this.phase = 'swing';
-          if (this.type === 'archer') {
-            const dir = player.x > this.x ? 1 : -1;
-            GameState.projectiles.push({
-              x: this.x + (dir > 0 ? this.w + 10 : -10),
-              y: this.y + 35,
-              vx: dir * 420,
-              dmg: this.dmg,
-              r: 10,
-              isPlayer: false,
-              life: 3.0
-            });
-            this.phase = 'idle';
-            this.atkCooldown = 2.4;
-          } else {
-            if (dist < 90) {
-              const res = player.takeDamage(this.dmg, ink, engine);
-              if (res === 'parried') {
-                this.phase = 'recovery';
-                this.phaseTimer = 0.6;
-              } else {
-                this.phase = 'idle';
-                this.atkCooldown = 2.0;
-              }
-            } else {
-              this.phase = 'recovery';
-              this.phaseTimer = 0.4;
-            }
-          }
-        } else if (this.phase === 'recovery') {
-          this.phase = 'idle';
-          this.atkCooldown = 1.8;
-        }
+    } else if (this.type === 'WARDEN') {
+      // 계율 감시자: 공중에 떠서 플레이어 주변을 압박하며 붉은 부적 구체 발사
+      const targetY = player.y - 110 + Math.sin(this.animSeed) * 25;
+      this.vy = (targetY - this.y) * 2.5;
+      if (dist < 520 && dist > 160) {
+        this.vx = this.facing * 110;
+      } else {
+        this.vx *= 0.9;
       }
-      return;
-    }
 
-    // 결계 안전 마진(160px) 준수
-    let enemyMaxX = GameState.worldWidth - 50;
-    if (GameState.activeBarrierX !== null) enemyMaxX = GameState.activeBarrierX - 160;
-    let enemyMinX = 30;
-    if (GameState.minBarrierX !== null) enemyMinX = GameState.minBarrierX + 60;
-
-    if (this.type === 'grunt') {
-      if (dist > 70) this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
-      else if (this.atkCooldown <= 0) {
-        this.phase = 'windup';
-        this.phaseTimer = 0.35;
-      }
-    } else if (this.type === 'archer') {
-      if (dist < 340) this.x += (player.x > this.x ? -1 : 1) * this.speed * dt;
-      if (this.atkCooldown <= 0 && dist < 650) {
-        this.phase = 'windup';
-        this.phaseTimer = 0.4;
-      }
-    } else {
-      this.x += (player.x > this.x ? 1 : -1) * this.speed * dt;
-      if (dist < 80 && this.atkCooldown <= 0) {
-        this.phase = 'windup';
-        this.phaseTimer = 0.25;
+      this.attackTimer -= dt;
+      if (this.attackTimer <= 0 && dist < 550) {
+        this.attackTimer = 2.6;
+        const angle = Math.atan2(dy, dx);
+        stage.spawnProjectile({
+          x: this.x,
+          y: this.y,
+          vx: Math.cos(angle) * 340,
+          vy: Math.sin(angle) * 340,
+          damage: 20,
+          color: '#c92a2a',
+          fromEnemy: true
+        });
       }
     }
 
-    this.x = Math.max(enemyMinX, Math.min(enemyMaxX, this.x));
-
-    // 발판 착지 검사
-    this.vy += 1300 * dt;
+    // 이동 및 플랫폼 바닥 충돌
+    this.x += this.vx * dt;
     this.y += this.vy * dt;
-    this.isGrounded = false;
 
-    for (const plat of platforms) {
-      if (
-        this.x + this.w > plat.x &&
-        this.x < plat.x + plat.w &&
-        this.y + this.h >= plat.y &&
-        this.y + this.h <= plat.y + 20
-      ) {
-        this.y = plat.y - this.h;
-        this.vy = 0;
-        this.isGrounded = true;
-        break;
+    if (this.type !== 'WARDEN') {
+      const halfH = this.height * 0.5;
+      for (const p of stage.platforms) {
+        if (
+          this.x > p.x &&
+          this.x < p.x + p.w &&
+          this.y + halfH >= p.y &&
+          this.y + halfH <= p.y + 24 &&
+          this.vy >= 0
+        ) {
+          this.y = p.y - halfH;
+          this.vy = 0;
+        }
       }
-    }
-
-    if (!this.isGrounded && this.y + this.h >= 620) {
-      this.y = 620 - this.h;
-      this.vy = 0;
-      this.isGrounded = true;
     }
   }
 
-  render(cameraX) {
-    if (this.x + this.w < cameraX - 50 || this.x > cameraX + 1330) return;
+  render(ctx, camera) {
+    if (this.isDead) return;
+    const sx = this.x - camera.x;
+    const sy = this.y - camera.y;
+    if (sx < -80 || sx > 1360) return;
 
-    const ctx = this.ctx;
     ctx.save();
+    ctx.translate(sx, sy);
 
-    if (this.isDead) {
-      const alpha = Math.max(0, this.deathTimer / 0.35);
-      ctx.fillStyle = `rgba(20, 16, 12, ${alpha * 0.7})`;
-      ctx.beginPath();
-      ctx.ellipse(this.x + this.w / 2, this.y + this.h - 10, this.w * 0.8, 15, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      return;
+    // 체력바 표시 (피격된 적만)
+    if (this.hp < this.maxHp) {
+      ctx.fillStyle = 'rgba(20,20,19,0.5)';
+      ctx.fillRect(-20, -this.height * 0.5 - 12, 40, 5);
+      ctx.fillStyle = '#c92a2a';
+      ctx.fillRect(-20, -this.height * 0.5 - 12, 40 * (this.hp / this.maxHp), 5);
     }
 
-    ctx.translate(this.x + this.w / 2, this.y + this.h);
-    if (this.phase === 'windup') ctx.rotate(0.15);
-    if (this.phase === 'recovery') ctx.rotate(-0.25);
+    ctx.scale(this.facing, 1);
+    ctx.fillStyle = this.hitFlashTimer > 0 ? '#c92a2a' : '#141413';
 
-    ctx.fillStyle = this.phase === 'windup' ? "#681818" : (this.phase === 'recovery' ? "#383228" : "#241f1a");
-
-    if (this.type === 'grunt') {
-      ctx.fillRect(-this.w / 2, -this.h + 16, this.w, this.h - 16);
+    if (this.type === 'INK_GHOST') {
+      // 일그러진 먹물 망령 실루엣
       ctx.beginPath();
-      ctx.moveTo(0, -this.h);
-      ctx.lineTo(this.w / 2 + 8, -this.h + 16);
-      ctx.lineTo(-this.w / 2 - 8, -this.h + 16);
+      ctx.arc(0, -10, 14, Math.PI, 0);
+      ctx.lineTo(16, 22 + Math.sin(this.animSeed) * 4);
+      ctx.lineTo(0, 16);
+      ctx.lineTo(-16, 24 - Math.sin(this.animSeed) * 4);
       ctx.closePath();
       ctx.fill();
-    } else if (this.type === 'archer') {
-      ctx.fillRect(-this.w / 2 + 5, -this.h + 10, this.w - 10, this.h - 10);
-      ctx.strokeStyle = "#40382f";
+
+      ctx.fillStyle = '#e8e2d5';
+      ctx.fillRect(4, -12, 5, 3);
+    } else if (this.type === 'ARCHER') {
+      // 삿갓 쓴 화폭 궁수
+      ctx.fillRect(-10, -12, 20, 34);
+      ctx.beginPath();
+      ctx.moveTo(-18, -12);
+      ctx.lineTo(18, -12);
+      ctx.lineTo(0, -24);
+      ctx.closePath();
+      ctx.fill();
+
+      // 활(弓) 렌더링
+      ctx.strokeStyle = '#9e1b1b';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(-this.w / 2, -this.h / 2, 28, -Math.PI * 0.4, Math.PI * 0.4);
+      ctx.arc(8, 0, 18, -Math.PI * 0.4, Math.PI * 0.4);
       ctx.stroke();
-    } else {
-      ctx.fillRect(-this.w / 2, -this.h + 14, this.w, this.h - 14);
-      ctx.beginPath();
-      ctx.moveTo(-10, -this.h + 14);
-      ctx.lineTo(-2, -this.h - 8);
-      ctx.lineTo(6, -this.h + 14);
-      ctx.fill();
-    }
+    } else if (this.type === 'WARDEN') {
+      // 공중에 떠 있는 부적 감시자
+      ctx.rotate(Math.sin(this.animSeed * 0.5) * 0.15);
+      ctx.strokeStyle = '#c92a2a';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(-18, -22, 36, 44);
+      ctx.fillRect(-12, -16, 24, 32);
 
-    if (this.phase === 'tell') {
-      ctx.fillStyle = "#ffffff";
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 18;
-      ctx.beginPath();
-      ctx.arc(0, -this.h - 15, 12, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#e8e2d5';
+      ctx.font = 'bold 16px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('禁', 0, 6);
     }
 
     ctx.restore();
