@@ -2,87 +2,198 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>묵검 (墨劍)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>묵검(墨劍) : 화폭의 망자</title>
   <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#141413">
+  <!-- 동양풍 명조/서예 웹폰트 (오프라인 시 시스템 명조체로 자동 폴백) -->
+  <link href="https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&family=Noto+Serif+KR:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
-  <div id="app-container">
-    <div class="top-nav">
-      <button id="pause-btn" class="ink-btn">❚❚ 일시정지 (P)</button>
-      <button id="help-btn" class="ink-btn">? 조작법 (H)</button>
-      <button id="clear-cache-btn" class="ink-btn" style="color: #8a2420;">⚡ 캐시비우기 (C)</button>
-      <button id="fullscreen-btn" class="ink-btn">⛶ 전체화면 (F)</button>
+  <div id="game-wrapper">
+    <!-- 메인 게임 렌더링 캔버스 -->
+    <canvas id="game-canvas" width="1280" height="720"></canvas>
+
+    <!-- 한지 질감 및 먹물 비네팅 오버레이 -->
+    <div id="hanji-overlay"></div>
+    <div id="vignette-overlay"></div>
+
+    <!-- 인게임 전투 HUD -->
+    <div id="hud" class="hidden">
+      <div class="hud-top">
+        <!-- 플레이어 상태 (체력, 혈묵, 덧칠 횟수, 장착 명묵) -->
+        <div class="status-box">
+          <div class="Seal-badge" id="hud-ink-badge" title="현재 장착된 명묵">墨</div>
+          <div class="bars-wrap">
+            <div class="bar-label">기력(氣力) <span id="hp-text">100/100</span></div>
+            <div class="bar-container hp-bar-bg">
+              <div id="hp-bar" class="bar-fill"></div>
+            </div>
+            <div class="bar-label">혈묵(血墨 - 살생의 업) <span id="karma-text">0%</span></div>
+            <div class="bar-container karma-bar-bg">
+              <div id="karma-bar" class="bar-fill"></div>
+            </div>
+            <div class="sub-stats">
+              <span>덧칠(부활)의 업: <strong id="death-count">0</strong>회</span>
+              <span>사슬 쿨타임: <strong id="chain-status">준비됨</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 현재 화폭의 금기 (수묵화 세계 규칙 표시창) -->
+        <div class="rule-box">
+          <div class="rule-header">【 화주(畫主)의 계율 】</div>
+          <div id="active-rule-title" class="rule-title">여백의 금기</div>
+          <div id="active-rule-desc" class="rule-desc">먹물이 닿지 않은 백지(공중)에 3초 이상 머물면 존재가 지워진다.</div>
+          <div id="rule-penalty-gauge" class="rule-gauge-bg">
+            <div id="rule-penalty-fill" class="rule-gauge-fill"></div>
+          </div>
+        </div>
+
+        <!-- 우측 퀵 메뉴 -->
+        <div class="hud-menu-btns">
+          <button id="btn-open-equip" class="ink-btn-small">장구(낙관/먹)</button>
+          <button id="btn-pause" class="ink-btn-small">화폭 접기(일시정지)</button>
+        </div>
+      </div>
+
+      <!-- 보스 체력바 (보스전 돌입 시 활성화) -->
+      <div id="boss-hud" class="hidden">
+        <div id="boss-name" class="boss-title">사군자 : 매화검귀(梅花劍鬼)</div>
+        <div class="boss-bar-bg">
+          <div id="boss-hp-bar" class="boss-bar-fill"></div>
+        </div>
+      </div>
+
+      <!-- 스토리 대화창 및 회상 나레이션 (전우치/산나비 스타일) -->
+      <div id="story-box" class="hidden">
+        <div id="speaker-seal" class="speaker-seal">화공</div>
+        <div class="dialogue-content">
+          <div id="speaker-name" class="speaker-name">이름 모를 화공</div>
+          <div id="dialogue-text" class="dialogue-text">이 화폭을 전부 갈기갈기 찢어발겨서라도... 내 아이를 데려오겠다.</div>
+        </div>
+        <div class="dialogue-next">클릭 또는 [Space]로 계속 ▶</div>
+      </div>
     </div>
 
-    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+    <!-- 타이틀 메인 화면 -->
+    <div id="title-screen" class="screen-overlay">
+      <div class="title-content">
+        <div class="red-stamp">화폭지옥</div>
+        <h1 class="game-title">묵 검 <span>墨劍</span></h1>
+        <p class="game-subtitle">— 화폭의 망자 (亡者) —</p>
 
-    <div class="mobile-controls">
-      <div class="touch-group">
-        <button id="m-left" class="stamp-btn sub">◀</button>
-        <button id="m-right" class="stamp-btn sub">▶</button>
-        <button id="m-jump" class="stamp-btn sub">躍<span>점프</span></button>
+        <div class="account-status-bar">
+          접속 화공: <strong id="current-user-display">나그네 (비로그인)</strong>
+          <button id="btn-account-modal" class="ink-btn-inline">호패(계정/백업) 관리</button>
+        </div>
+
+        <div class="menu-buttons">
+          <button id="btn-start-game" class="ink-btn-large">화폭으로 들어가기 (새로운 시작 / 이어하기)</button>
+          <button id="btn-title-equip" class="ink-btn-large">문방사우 및 낙관 정비</button>
+          <button id="btn-controls-info" class="ink-btn-large">무공 비급 (조작법 및 세계관 규칙)</button>
+        </div>
       </div>
-      <div class="touch-group">
-        <button id="m-dash" class="stamp-btn sub">迅<span>대시</span></button>
-        <button id="m-parry" class="stamp-btn sub">返<span>패링</span></button>
-        <button id="m-heavy" class="stamp-btn">破<span>차지</span></button>
-        <button id="m-atk" class="stamp-btn">斬<span>베기</span></button>
-        <button id="m-sp" class="stamp-btn" style="background:#1a1714; border-color:#8a2020;">墨<span>필살</span></button>
+    </div>
+
+    <!-- 자체 계정 & 세이브 슬롯 & 화첩 인장(백업 코드) 모달 -->
+    <div id="account-modal" class="modal-overlay hidden">
+      <div class="modal-scroll">
+        <div class="modal-header">
+          <h2>호패(계정) 및 화첩 기록 관리</h2>
+          <button class="btn-close-modal" data-target="account-modal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- 로그인 / 계정 생성 탭 -->
+          <div class="auth-section">
+            <h3>화공 호패 등록 / 접속 (오프라인 자체 계정)</h3>
+            <div class="auth-inputs">
+              <input type="text" id="auth-id" placeholder="호패 이름 (ID)" maxlength="16">
+              <input type="password" id="auth-pw" placeholder="암호 (PW)" maxlength="20">
+              <button id="btn-login" class="ink-btn-small">접속/생성</button>
+              <button id="btn-logout" class="ink-btn-small">하산(로그아웃)</button>
+            </div>
+            <p id="auth-msg" class="sys-msg">등록되지 않은 호패 입력 시 즉시 새 계정이 생성됩니다.</p>
+          </div>
+
+          <hr class="ink-divider">
+
+          <!-- 3개 세이브 슬롯 -->
+          <div class="slots-section">
+            <h3>기억의 두루마리 (세이브 슬롯)</h3>
+            <div id="save-slots-container" class="slots-grid">
+              <!-- JS에서 동적 생성 -->
+            </div>
+          </div>
+
+          <hr class="ink-divider">
+
+          <!-- 화첩 인장 코드 (문자열 내보내기/불러오기) -->
+          <div class="backup-section">
+            <h3>화첩 인장 코드 (기기 간 세이브 이전)</h3>
+            <p class="desc-small">서버 없이 다른 기기에서 이어하려면 아래 인장 코드를 복사해 다른 기기에 붙여넣으십시오.</p>
+            <textarea id="backup-code-area" rows="3" placeholder="인장 코드가 이곳에 표시되거나, 불러올 코드를 붙여넣으십시오."></textarea>
+            <div class="backup-btns">
+              <button id="btn-export-code" class="ink-btn-small">현재 기록을 코드로 추출</button>
+              <button id="btn-import-code" class="ink-btn-small">코드로 기록 복원하기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 장구(문방사우 명묵 & 낙관 장착) 및 기억 조각 모달 -->
+    <div id="equip-modal" class="modal-overlay hidden">
+      <div class="modal-scroll">
+        <div class="modal-header">
+          <h2>문방사우(명묵) 및 낙관 각인</h2>
+          <button class="btn-close-modal" data-target="equip-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="equip-section">
+            <h3>명묵(名墨) 선택 — 검과 사슬의 속성 (1종 장착)</h3>
+            <div id="ink-list-container" class="item-grid"></div>
+          </div>
+          <hr class="ink-divider">
+          <div class="equip-section">
+            <h3>낙관(落款) 각인 — 전투 비기 (최대 2개 각인 가능)</h3>
+            <div id="seal-list-container" class="item-grid"></div>
+          </div>
+          <hr class="ink-divider">
+          <div class="equip-section">
+            <h3>고서화 잔편 (아이의 기억 조각 수집 현황)</h3>
+            <div id="memory-list-container" class="memory-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 조작법 및 규칙 안내 모달 -->
+    <div id="controls-modal" class="modal-overlay hidden">
+      <div class="modal-scroll">
+        <div class="modal-header">
+          <h2>무공 비급 (조작 및 화폭의 법칙)</h2>
+          <button class="btn-close-modal" data-target="controls-modal">✕</button>
+        </div>
+        <div class="modal-body guide-text">
+          <p><strong>[이동 및 도약]</strong> <kbd>A</kbd> <kbd>D</kbd> 또는 <kbd>←</kbd> <kbd>→</kbd> 이동 / <kbd>W</kbd>, <kbd>Space</kbd> 도약 및 벽 차기(Wall Jump)</p>
+          <p><strong>[묵영보(대시)]</strong> <kbd>Shift</kbd> 또는 <kbd>L</kbd> (지상 및 공중 고속 대시, 먹물 잔상 생성)</p>
+          <p><strong>[묵검술(베기)]</strong> <kbd>J</kbd> 또는 <kbd>좌클릭</kbd> (3단 연속 베기 / 길게 눌렀다 떼면 강력한 <strong>발도 차지 베기</strong>)</p>
+          <p><strong>[묵사슬(산나비 와이어)]</strong> <kbd>K</kbd> 또는 <kbd>우클릭</kbd> (마우스 커서 또는 전방 상단의 고리/적에게 묵사슬 투척 후 진자 반동 기동 및 적에게 고속 돌진)</p>
+          <hr class="ink-divider">
+          <p><strong>[혈묵(血墨)과 덧칠(부활)의 법칙]</strong></p>
+          <ul>
+            <li>화폭의 적과 기물을 파괴할수록 몸에 <strong>혈묵(업보)</strong>이 쌓입니다. 100%에 도달하면 공격력이 2배가 되나, 단 한 번의 피격으로 즉사(탈묵)합니다.</li>
+            <li>사망 시 보이지 않는 거대한 붓이 당신을 다시 덧칠하여 부활시킵니다. 단, <strong>덧칠 횟수가 누적될수록 주인공의 외형이 먹물로 일그러지며</strong> 결말에 영향을 미칩니다.</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- [자가 진단 스크립트: 흰 화면 버그 원천 차단] -->
-  <script>
-    // 1. file:/// 로컬 실행 감지 경고
-    if (window.location.protocol === 'file:') {
-      window.addEventListener('load', () => {
-        const cvs = document.getElementById('gameCanvas');
-        if (cvs) {
-          const ctx = cvs.getContext('2d');
-          ctx.fillStyle = "#2c2620";
-          ctx.fillRect(0, 0, cvs.width, cvs.height);
-          ctx.fillStyle = "#ff6b6b";
-          ctx.font = "bold 26px sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText("경고: file:/// 로컬 파일로 직접 실행할 수 없습니다!", 640, 320);
-          ctx.fillStyle = "#f7f4eb";
-          ctx.font = "18px sans-serif";
-          ctx.fillText("브라우저 보안(CORS)으로 모듈이 차단되었습니다. VS Code의 'Live Server'로 실행하세요.", 640, 370);
-        }
-      });
-    }
-
-    // 2. 화면 직접 에러 출력기 (스크립트 오류 시 흰 화면 대신 에러 로그 출력)
-    window.addEventListener('error', (e) => {
-      const cvs = document.getElementById('gameCanvas');
-      if (cvs) {
-        const ctx = cvs.getContext('2d');
-        ctx.fillStyle = "rgba(40, 10, 10, 0.95)";
-        ctx.fillRect(40, 40, cvs.width - 80, cvs.height - 80);
-        ctx.fillStyle = "#ff8888";
-        ctx.font = "bold 22px monospace";
-        ctx.textAlign = "left";
-        ctx.fillText("자바스크립트 실행 오류 감지:", 70, 90);
-        ctx.font = "16px monospace";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(e.message || "Unknown Script Error", 70, 130);
-        ctx.fillText(`파일: ${e.filename || 'module'} (${e.lineno}:${e.colno})`, 70, 170);
-      }
-    });
-
-    // 3. 서비스 워커 안전 등록
-    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
-      });
-    }
-  </script>
-
+  <!-- 메인 진입 스크립트 (ES6 Module) -->
   <script type="module" src="main.js"></script>
 </body>
 </html>
