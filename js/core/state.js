@@ -1,4 +1,3 @@
-// 문방사우 : 명묵(名墨) 데이터베이스 (무기 및 사슬 속성)
 export const INK_TYPES = {
   black: {
     id: 'black',
@@ -46,7 +45,6 @@ export const INK_TYPES = {
   }
 };
 
-// 낙관(落款) 데이터베이스 (메가맨 제로의 칩/파츠 개념 - 최대 2개 장착)
 export const SEALS_DATA = {
   slash_wave: {
     id: 'slash_wave',
@@ -86,7 +84,6 @@ export const SEALS_DATA = {
   }
 };
 
-// 고서화 잔편 (아이의 기억 조각 - 스토리 진엔딩 조건)
 export const MEMORIES_DATA = [
   {
     id: 'mem_1',
@@ -110,7 +107,6 @@ export const MEMORIES_DATA = [
   }
 ];
 
-// 화폭의 금기(수묵화 세계 규칙) 프리셋
 export const PAINTING_RULES = {
   VOID_EROSION: {
     id: 'VOID_EROSION',
@@ -132,48 +128,46 @@ export const PAINTING_RULES = {
   }
 };
 
-// 초기 기본 세이브 데이터 생성 팩토리
 export function createDefaultSaveData(slotIndex = 0) {
   return {
     slotIndex,
     updatedAt: new Date().toLocaleString('ko-KR'),
     chapter: 1,
     stage: 1,
-    deathCount: 0, // 덧칠(부활) 횟수 - 높을수록 캐릭터 외형이 먹물 괴물로 변함
-    karma: 0,      // 혈묵 수치 (0 ~ 100)
+    deathCount: 0,
+    karma: 0,
     equippedInk: 'black',
-    unlockedInks: ['black', 'vermilion', 'azure', 'gold'], // 테스트 및 즉시 체험을 위해 4대 명묵 기본 해금
+    unlockedInks: ['black', 'vermilion', 'azure', 'gold'],
     equippedSeals: ['slash_wave', 'chain_blade'],
     unlockedSeals: ['slash_wave', 'chain_blade', 'blood_frenzy', 'void_step', 'ink_shield', 'reaper_brush'],
-    collectedMemories: ['mem_1'], // 1번 기억 기본 보유
+    collectedMemories: ['mem_1'],
     clearedStages: []
   };
 }
 
-// 런타임 전역 상태 객체
 export const GameState = {
-  currentUser: null, // 현재 로그인한 호패(ID), null이면 'guest'
+  currentUser: null,
   activeSlot: 0,
   saveData: createDefaultSaveData(0),
 
-  // 인게임 실시간 상태
   isRunning: false,
   isPaused: false,
   inDialogue: false,
-  timeScale: 1.0,   // 산나비식 슬로우 모션(불릿 타임) 제어용
-  hitStopTimer: 0,  // 타격감(히트스톱) 제어용
+  timeScale: 1.0,
+  hitStopTimer: 0,
 
   playerStats: {
     hp: 100,
     maxHp: 100,
-    karma: 0,       // 0 ~ 100% (100% 도달 시 광폭화: 공격력 2배, 피격 시 즉사)
+    lives: 3,      // 현재 스테이지의 남은 목숨(영혼의 심지)
+    maxLives: 3,   // 기본 제공 목숨 3개
+    karma: 0,
     isBerserk: false,
-    rulePenaltyRatio: 0 // 현재 화폭의 금기 위반 게이지 (0.0 ~ 1.0)
+    rulePenaltyRatio: 0
   },
 
   currentRule: PAINTING_RULES.VOID_EROSION,
 
-  // 장착 아이템 효과 계산 헬퍼
   getActiveInk() {
     return INK_TYPES[this.saveData.equippedInk] || INK_TYPES.black;
   },
@@ -186,6 +180,19 @@ export const GameState = {
     this.playerStats.karma = Math.min(100, Math.max(0, this.playerStats.karma + amount));
     this.playerStats.isBerserk = this.playerStats.karma >= 100;
     this.saveData.karma = this.playerStats.karma;
+  },
+
+  // 목숨 구슬 텍스트 반환 (예: ● ● ○)
+  getLivesString() {
+    const cur = Math.max(0, this.playerStats.lives);
+    const max = this.playerStats.maxLives;
+    return '● '.repeat(cur) + '○ '.repeat(Math.max(0, max - cur)).trim();
+  },
+
+  resetLivesForStage() {
+    this.playerStats.lives = this.playerStats.maxLives;
+    this.playerStats.hp = this.playerStats.maxHp;
+    this.playerStats.rulePenaltyRatio = 0;
   },
 
   recordDeathAndRepaint() {
