@@ -530,3 +530,70 @@ kbd {
   border-radius: 3px;
   font-size: 12px;
 }
+/* 목숨(심지) 표시 및 사망 안내 모달 전용 스타일 */
+.lives-wrap {
+  color: var(--ink-black);
+}
+
+.lives-dots {
+  color: var(--seal-red);
+  letter-spacing: 2px;
+  font-size: 14px;
+}
+
+.death-dialog {
+  max-width: 540px;
+  text-align: center;
+  position: relative;
+  border-color: var(--seal-red);
+  background: #ebe4d6;
+}
+
+.death-seal-stamp {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 14px;
+  border: 3px solid var(--seal-red);
+  color: var(--seal-red);
+  font-family: var(--font-title);
+  font-size: 38px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: rotate(-6deg);
+  background: rgba(201, 42, 42, 0.08);
+}
+
+.death-title {
+  font-size: 22px;
+  color: var(--ink-black);
+  margin-bottom: 12px;
+}
+
+.death-desc {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-gray);
+  margin-bottom: 16px;
+}
+
+.death-lives-box {
+  background: var(--hanji-dark);
+  border: 1px solid var(--ink-black);
+  padding: 10px;
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.death-Penalty-notice {
+  font-size: 12px;
+  color: var(--seal-red);
+  margin-bottom: 20px;
+}
+
+.death-action-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
