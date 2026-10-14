@@ -1,116 +1,147 @@
-export class InkEffect {
-  constructor(ctx) {
-    this.ctx = ctx;
-    this.poolSize = 100;
+export const InkEffects = {
+  particles: [],    // 튀기는 먹물 방울
+  afterimages: [],  // 대시 및 고속 사슬 이동 잔상
+  stains: [],       // 지형에 묻은 먹물/혈묵 얼룩 (화폭 손상 표현)
+
+  init() {
     this.particles = [];
-    for (let i = 0; i < this.poolSize; i++) {
-      this.particles.push({
-        active: false,
-        x: 0, y: 0, vx: 0, vy: 0, r: 0,
-        color: "rgba(22, 18, 15, ",
-        life: 0, maxLife: 0.5
-      });
-    }
+    this.afterimages = [];
     this.stains = [];
-  }
+  },
 
-  getFreeParticle() {
-    for (let i = 0; i < this.poolSize; i++) {
-      if (!this.particles[i].active) return this.particles[i];
-    }
-    return null;
-  }
-
-  splash(x, y, count = 16, color = "rgba(22, 18, 15, ") {
+  // 먹물 스플래시 생성 (타격, 피격, 점프, 착지 시)
+  spawnSplash(x, y, count = 12, color = '#141413', speedScale = 1.0) {
     for (let i = 0; i < count; i++) {
-      const p = this.getFreeParticle();
-      if (!p) break;
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 260 + 60;
-      p.active = true;
-      p.x = x;
-      p.y = y;
-      p.vx = Math.cos(angle) * speed;
-      p.vy = Math.sin(angle) * speed - 60;
-      p.r = Math.random() * 5 + 2;
-      p.color = color;
-      p.life = 0.55;
-      p.maxLife = 0.55;
-    }
-
-    if (y > 520 && this.stains.length < 40) {
-      this.stains.push({
-        x: x + (Math.random() - 0.5) * 40,
-        y: 618,
-        w: Math.random() * 35 + 20,
-        h: Math.random() * 8 + 4,
-        alpha: 0.45,
-        life: 4.0
+      const speed = (60 + Math.random() * 240) * speedScale;
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 80,
+        radius: 2.5 + Math.random() * 5.5,
+        color,
+        life: 0.45 + Math.random() * 0.45,
+        maxLife: 0.9,
+        gravity: 520
       });
     }
-  }
+  },
 
-  parryBurst(x, y) {
-    for (let i = 0; i < 28; i++) {
-      const p = this.getFreeParticle();
-      if (!p) break;
-      const angle = (i / 28) * Math.PI * 2;
-      const speed = Math.random() * 340 + 150;
-      p.active = true;
-      p.x = x;
-      p.y = y;
-      p.vx = Math.cos(angle) * speed;
-      p.vy = Math.sin(angle) * speed;
-      p.r = Math.random() * 6 + 2.5;
-      p.color = "rgba(18, 15, 12, ";
-      p.life = 0.45;
-      p.maxLife = 0.45;
+  // 메가맨 제로 + 산나비 스타일 먹물 잔상 추가
+  spawnAfterimage({ x, y, width, height, facing, color = 'rgba(20, 20, 19, 0.5)' }) {
+    this.afterimages.push({
+      x,
+      y,
+      width,
+      height,
+      facing,
+      color,
+      life: 0.25,
+      maxLife: 0.25
+    });
+  },
+
+  // 지형 표면에 먹물 얼룩 남기기
+  addStain(x, y, radius = 14, color = '#141413') {
+    if (this.stains.length > 180) {
+      this.stains.shift(); // 성능 유지를 위해 오래된 얼룩부터 제거
     }
-  }
+    this.stains.push({
+      x,
+      y,
+      radius,
+      color,
+      alpha: 0.55 + Math.random() * 0.25
+    });
+  },
 
-  update(dt) {
-    for (let i = 0; i < this.poolSize; i++) {
-      const p = this.particles[i];
-      if (!p.active) continue;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vy += 650 * dt;
-      p.life -= dt;
-      if (p.life <= 0) p.active = false;
+  update(dt, platforms = []) {
+    // 1. 먹물 파티클 물리 업데이트 및 지형 착지 시 얼룩 변환
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const pt = this.particles[i];
+      pt.vy += pt.gravity * dt;
+      pt.x += pt.vx * dt;
+      pt.y += pt.vy * dt;
+      pt.life -= dt;
+
+      // 플랫폼에 닿으면 화폭에 먹물 얼룩으로 스며듦
+      for (let p = 0; p < platforms.length; p++) {
+        const plat = platforms[p];
+        if (
+          pt.x >= plat.x &&
+          pt.x <= plat.x + plat.w &&
+          pt.y >= plat.y &&
+          pt.y <= plat.y + 14 &&
+          pt.vy > 0
+        ) {
+          if (Math.random() < 0.35) {
+            this.addStain(pt.x, plat.y + 2, pt.radius * 1.4, pt.color);
+          }
+          pt.life = 0;
+          break;
+        }
+      }
+
+      if (pt.life <= 0) {
+        this.particles.splice(i, 1);
+      }
     }
 
-    for (let i = this.stains.length - 1; i >= 0; i--) {
-      const st = this.stains[i];
-      st.life -= dt;
-      st.alpha = Math.max(0, (st.life / 4.0) * 0.45);
-      if (st.life <= 0) this.stains.splice(i, 1);
+    // 2. 잔상 수명 감소
+    for (let i = this.afterimages.length - 1; i >= 0; i--) {
+      this.afterimages[i].life -= dt;
+      if (this.afterimages[i].life <= 0) {
+        this.afterimages.splice(i, 1);
+      }
     }
-  }
+  },
 
-  render(cameraX) {
-    const ctx = this.ctx;
+  render(ctx, camera) {
     ctx.save();
 
-    for (const st of this.stains) {
-      if (st.x + st.w < cameraX || st.x > cameraX + 1280) continue;
-      ctx.fillStyle = `rgba(20, 16, 12, ${st.alpha})`;
-      ctx.beginPath();
-      ctx.ellipse(st.x, st.y, st.w, st.h, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // 1. 지형에 스며든 먹물 얼룩 렌더링
+    this.stains.forEach((st) => {
+      const sx = st.x - camera.x;
+      const sy = st.y - camera.y;
+      if (sx < -50 || sx > 1330) return;
 
-    for (let i = 0; i < this.poolSize; i++) {
-      const p = this.particles[i];
-      if (!p.active) continue;
-      if (p.x < cameraX - 50 || p.x > cameraX + 1330) continue;
-      const a = p.life / p.maxLife;
-      ctx.fillStyle = `${p.color}${a})`;
+      ctx.globalAlpha = st.alpha;
+      ctx.fillStyle = st.color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.ellipse(sx, sy, st.radius * 1.5, st.radius * 0.45, 0, 0, Math.PI * 2);
       ctx.fill();
-    }
+    });
+
+    // 2. 대시 잔상 렌더링 (검객 실루엣)
+    this.afterimages.forEach((af) => {
+      const sx = af.x - camera.x;
+      const sy = af.y - camera.y;
+      ctx.globalAlpha = (af.life / af.maxLife) * 0.55;
+      ctx.fillStyle = af.color;
+
+      // 삿갓과 도포 자락 형태의 수묵 잔상
+      ctx.beginPath();
+      ctx.moveTo(sx - af.width * 0.6, sy - af.height * 0.35);
+      ctx.lineTo(sx + af.width * 0.6, sy - af.height * 0.35);
+      ctx.lineTo(sx, sy - af.height * 0.62);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillRect(sx - af.width * 0.35, sy - af.height * 0.35, af.width * 0.7, af.height * 0.8);
+    });
+
+    // 3. 공중에 튀는 먹물 파티클 렌더링
+    this.particles.forEach((pt) => {
+      const sx = pt.x - camera.x;
+      const sy = pt.y - camera.y;
+      ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+      ctx.fillStyle = pt.color;
+      ctx.beginPath();
+      ctx.arc(sx, sy, pt.radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
     ctx.restore();
   }
-}
-
-export default InkEffect;
+};
